@@ -1,0 +1,45 @@
+---
+title: "Exploratory Analysis"
+author: "Kyle Dixon & Mia Li"
+date: "9/2/2020"
+output: html_document
+---
+
+```{r initialize, include = F}
+## Clear the environment
+#rm(list = ls())
+
+## Load libraries
+library(bit64)
+library(data.table)
+library(dplyr)
+library(ggplot2)
+
+knitr::opts_chunk$set(echo = T)
+```
+
+```{r clean_data}
+## Load raw data into the global environment
+tsla <- base::data.frame(data.table::fread("1 - Data/Tesla/tsla.csv", na.strings = c("#N/A N/A", "#N/A Invalid Field", "#N/A Requesting Data...")), stringsAsFactors = F)
+goog <- base::data.frame(data.table::fread("1 - Data/Google/goog.csv", na.strings = c("#N/A N/A", "#N/A Invalid Field", "#N/A Requesting Data...")), stringsAsFactors = F)
+
+## Clean raw data
+tsla <- tsla %>% dplyr::select_if(~sum(!is.na(.)) > 0) %>% # Drop columns that contain only NAs
+  dplyr::filter(!is.na(PX_LAST)) # Drop rows where PX_LAST is NA
+goog <- goog %>% dplyr::select_if(~sum(!is.na(.)) > 0) %>% # Drop columns that contain only NAs
+  dplyr::filter(!is.na(PX_LAST)) # Drop rows where PX_LAST is NA
+
+## Format date columns
+tsla$Date <- as.Date(tsla$Date, "%m/%d/%Y")
+goog$Date <- as.Date(goog$Date, "%m/%d/%Y")
+```
+
+```{r plot_data}
+## Plot prices versus time
+tsla_plot <- ggplot2::ggplot() + 
+  ggplot2::geom_line(data = tsla, aes(x = Date, y = PX_LAST)) + ggplot2::ggtitle("TSLA")
+goog_plot <- ggplot2::ggplot() + 
+  ggplot2::geom_line(data = goog, aes(x = Date, y = PX_LAST)) + ggplot2::ggtitle("GOOG") + 
+  scale_x_date(limits = c(min(tsla$Date), max(tsla$Date))) # Horizontally align the x-axis with TSLA
+gridExtra::grid.arrange(tsla_plot, goog_plot)
+```
