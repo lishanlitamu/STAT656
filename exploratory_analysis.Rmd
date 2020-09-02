@@ -1,6 +1,6 @@
 ---
 title: "Exploratory Analysis"
-author: "Kyle Dixon & Mia Li"
+author: "Kyle Dixon, Mia Li, Caitlin Hennessey"
 date: "9/2/2020"
 output: html_document
 ---
