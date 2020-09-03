@@ -4,7 +4,8 @@ author: "Kyle Dixon, Mia Li, Caitlin Hennessey"
 date: "9/2/2020"
 output: html_document
 ---
-
+### 1 - General review of raw data 
+#### 1.1 Load and clean data
 ```{r initialize, include = F}
 ## Clear the environment
 #rm(list = ls())
@@ -33,6 +34,7 @@ tsla$Date <- as.Date(tsla$Date, "%m/%d/%Y")
 goog$Date <- as.Date(goog$Date, "%m/%d/%Y")
 ```
 
+#### 1.2 Visualize data
 ```{r plot_data}
 ## Plot prices versus time
 tsla_plot <- ggplot2::ggplot() + 
@@ -42,10 +44,11 @@ goog_plot <- ggplot2::ggplot() +
   ggplot2::scale_x_date(limits = c(base::min(tsla$Date), base::max(tsla$Date))) # Align the x-axis with TSLA
 gridExtra::grid.arrange(tsla_plot, goog_plot)
 ```
-## Part 2 - Data Preprocessing
-###2.1 Count the number of Missing Values in each column
 
-```{r numNA}
+### 2 - Data Preprocessing
+#### 2.1 Count the number of Missing Values in each feature
+
+```{r numNA, warning=FALSE}
 require(dplyr)
 totalRowTsla = base::nrow(tsla)
 totalColTsla = base::ncol(tsla)
@@ -65,10 +68,10 @@ naGoog       = goog %>%
                tibble::rownames_to_column(., "Features")
 ```
 
-### Summary of results
-__Tesla__
+>__Tesla__
 
 Total number of rows: `r totalRowTsla`
+
 Total number of columns: `r totalColTsla`
 
 
@@ -77,14 +80,15 @@ Total number of columns: `r totalColTsla`
 knitr::kable(
  naTsla,
  col.names = c("Features","Number of Missing Values"),
- caption   = "Table 1-1: The number of Missing Values - Tesla",
+ caption   = "Table 2-1: The number of Missing Values - Tesla",
  align     = "lccrr"
 )
 ```
 
-__Google__
+>__Google__
 
 Total number of rows: `r totalRowGoog`
+
 Total number of columns: `r totalColGoog`
 
 
@@ -92,38 +96,55 @@ Total number of columns: `r totalColGoog`
 knitr::kable(
  naGoog,
  col.names = c("Features","Number of Missing Values"),
- caption   = "Table 1-2: The number of Missing Values - Google",
+ caption   = "Table 2-2: The number of Missing Values - Google",
  align     = "lccrr"
 )
 ```
 
 
-###2.2 Data Transformation 
-```{r dataTransTsla}
-require(e1071)
-require(dplyr)
+#### 2.2 Data Transformation 
 
-skewValuesTsla = tsla %>%
-  .[,(base::which(naTsla[,2] < 100))] %>%
-  .[!(base::apply(.,1, function(y){any(is.na(y))})),] %>%
-  .[,-1] %>%
-  base::apply(.,2,e1071::skewness)
-
+##### 2.2.1 Data Filtering - Tesla
+Features with less than 100 missing values will be included by deleting corresponding rows with missing values instead.
+```{r filterTsla, warning=FALSE}
 #Select a subset of original data for data transformation and PCA
 tslaSelected = tsla %>%
   .[,(base::which(naTsla[,2] < 100))] %>%
   .[!(base::apply(.,1, function(y){any(is.na(y))})),] %>%
   .[,-1] #remove dates in the first column
 
-#Apply Log-transformation on tslaSelected$TURNOVER
+#Apply Log-transformation on tslaSelected$TURNOVER to avoid producing NaN in skewness computation
 tslaSelected$TURNOVER = base::log(tslaSelected$TURNOVER)
 base::names(tslaSelected) [6]= "log(TURNOVER)"
+```
 
-#Transformation on the selected subset of data
+##### 2.2.2 Calculate Skewness - Tesla
+```{r skewnessTsla, warning=FALSE}
+require(e1071)
+skewValuesTsla = base::apply(tslaSelected,2,e1071::skewness)
+```
+
+```{r skewnessTslaTable, warning=FALSE, echo=FALSE}
+skewValuesTsla = skewValuesTsla%>%
+               base::as.data.frame() %>%
+               tibble::rownames_to_column(., "features")
+
+knitr::kable(
+ skewValuesTsla,
+ col.names = c("Features","Skewness"),
+ caption   = "Table 2-3: Skewness of Selected Features - Tesla",
+ align     = "lccrr"
+)
+```
+
+##### 2.2.3 Data Transformation - Tesla
+```{r dataTransTsla, warning=FALSE}
+#Transform the selected data
 (tslaTrans = caret::preProcess(tslaSelected, method = c("BoxCox","center","scale","pca")))
 
 #Apply the transformations("BoxCox","center","scale","pca")
 tslaPCA = stats::predict(tslaTrans,tslaSelected) #Outputs are PCA components
+utils::head(tslaPCA)
 
 #Summary of PCA results
 (tslaTrans_     = caret::preProcess(tslaSelected, method = c("BoxCox","center","scale")))
@@ -135,21 +156,9 @@ propVarTslaPCA #proportion of variance explained by each PCs
 
 ```
 
-```{r dataTransGoog}
-require(e1071)
-require(dplyr)
-
-skewValuesGoog = goog %>%
-  .[,(base::which(naGoog[,2] < 100))] %>%
-  #Columns with less than 100 missing values will be included 
-  #by deleting corresponding rows with missing values instead.
-  .[!(base::apply(.,1, function(y){any(is.na(y))})),] %>%
-  .[,-1] %>%
-  base::apply(.,2,e1071::skewness)
-
-skewValuesGoog #The skewness of TURNOVER is NaN. 
-               #Suggest to apply Log-transformation on googSelected$TURNOVER.
-
+##### 2.2.4 Data Filtering - Google
+Features with less than 100 missing values will be included by deleting corresponding rows with missing values instead.
+```{r filterGoog, warning=FALSE}
 #Select a subset of original data for data transformation and PCA
 googSelected = goog %>%
   .[,(base::which(naGoog[,2] < 100))] %>%
@@ -159,16 +168,40 @@ googSelected = goog %>%
 #Apply Log-transformation on googSelected$TURNOVER
 googSelected$TURNOVER = base::log(googSelected$TURNOVER)
 base::names(googSelected) [6]= "log(TURNOVER)"
+```
 
 
-#Transformation on the selected subset of data
+##### 2.2.5 Calculate Skewness - Google
+```{r skewnessGoog, warning=FALSE}
+#require(e1071)
+skewValuesGoog = base::apply(googSelected,2,e1071::skewness)
+```
+
+```{r skewnessGoogTable, warning=FALSE, echo=FALSE}
+skewValuesGoog = skewValuesGoog%>%
+               base::as.data.frame() %>%
+               tibble::rownames_to_column(., "features")
+
+knitr::kable(
+ skewValuesTsla,
+ col.names = c("Features","Skewness"),
+ caption   = "Table 2-4: Skewness of Selected Features - Google",
+ align     = "lccrr"
+)
+```
+
+
+##### 2.2.6 Data Transformation - Google
+```{r dataTransGoog, warning=FALSE}
+#Transform the selected data
 (googTrans = caret::preProcess(googSelected, method = c("BoxCox","center","scale","pca")))
 
 #Apply the transformations("BoxCox","center","scale","pca")
 googPCA = stats::predict(googTrans,googSelected) #Outputs are PCA components
+utils::head(googPCA)
 
 #Summary of PCA results
-(googTrans_     = caret::preProcess(googSelected, method = c("BoxCox","center","scale")))
+(googTrans_    = caret::preProcess(googSelected, method = c("BoxCox","center","scale")))
 propVarGoogPCA = googSelected %>%
                  stats::predict(googTrans_,.) %>%
                  stats::prcomp() %>%
@@ -177,19 +210,22 @@ propVarGoogPCA #proportion of variance explained by each PCs
 ```
 
 
-###2.3 Correlations between features 
-__Tesla__
-```{r findCorrelationTsla}
+### 2.3 Correlation Analysis 
+>__Tesla__
+```{r findCorrelationTsla, warning=FALSE}
 library(corrplot)
-(corrTsla     = stats::cor(tslaSelected))
+corrTsla     = stats::cor(tslaSelected)
 corrplot::corrplot(corrTsla, order="hclust")
 ```
 
+#### Fig. 2.1 Correlations between features - Tesla
 
-__Google__
-```{r findCorrelationGoog}
+
+>__Google__
+```{r findCorrelationGoog, warning=FALSE}
 #library(corrplot)
-(corrGoog     = stats::cor(googSelected))
+corrGoog     = stats::cor(googSelected)
 corrplot::corrplot(corrGoog, order="hclust")
 ```
 
+#### Fig. 2.2 Correlations between features - Google
