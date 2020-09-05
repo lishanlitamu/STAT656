@@ -7,14 +7,16 @@ output: html_document
 ### 1 - General review of raw data 
 #### 1.1 Load and clean data
 ```{r initialize, include = F}
-## Clear the environment
-#rm(list = ls())
-
 ## Load libraries
 library(bit64)
+library(caret)
+library(corrplot)
+library(e1071)
 library(data.table)
 library(dplyr)
 library(ggplot2)
+library(httr)
+
 knitr::opts_chunk$set(echo = T)
 ```
 
@@ -212,6 +214,7 @@ propVarGoogPCA #proportion of variance explained by each PCs
 
 ### 2.3 Correlation Analysis 
 >__Tesla__
+
 ```{r findCorrelationTsla, warning=FALSE}
 library(corrplot)
 corrTsla     = stats::cor(tslaSelected)
@@ -222,6 +225,7 @@ corrplot::corrplot(corrTsla, order="hclust")
 
 
 >__Google__
+
 ```{r findCorrelationGoog, warning=FALSE}
 #library(corrplot)
 corrGoog     = stats::cor(googSelected)
