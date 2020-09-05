@@ -1,9 +1,13 @@
 ---
 title: "Exploratory Analysis"
 author: "Kyle Dixon, Mia Li, Caitlin Hennessey"
-date: "9/2/2020"
+date: "9/4/2020"
 output: html_document
 ---
+
+## Project Topic: 
+## Analyzing the impact of news and social media sentiment on stock prices.
+
 ### 1 - General review of raw data 
 #### 1.1 Load and clean data
 ```{r initialize, include = F}
@@ -120,21 +124,33 @@ tslaSelected$TURNOVER = base::log(tslaSelected$TURNOVER)
 base::names(tslaSelected) [6]= "log(TURNOVER)"
 ```
 
-##### 2.2.2 Calculate Skewness - Tesla
+##### 2.2.2 Calculate Skewness and Kurtosis - Tesla
 ```{r skewnessTsla, warning=FALSE}
 require(e1071)
-skewValuesTsla = base::apply(tslaSelected,2,e1071::skewness)
+skewnessTsla = base::apply(tslaSelected,2,e1071::skewness)
+kurtosisTsla   = base::apply(tslaSelected,2,e1071::kurtosis)
 ```
 
 ```{r skewnessTslaTable, warning=FALSE, echo=FALSE}
-skewValuesTsla = skewValuesTsla%>%
+skewnessTsla = skewnessTsla %>%
                base::as.data.frame() %>%
                tibble::rownames_to_column(., "features")
 
 knitr::kable(
- skewValuesTsla,
+ skewnessTsla,
  col.names = c("Features","Skewness"),
  caption   = "Table 2-3: Skewness of Selected Features - Tesla",
+ align     = "lccrr"
+)
+
+kurtosisTsla = kurtosisTsla %>%
+               base::as.data.frame() %>%
+               tibble::rownames_to_column(., "features")
+
+knitr::kable(
+ kurtosisTsla,
+ col.names = c("Features","Kurtosis"),
+ caption   = "Table 2-4: Kurtosis of Selected Features - Tesla",
  align     = "lccrr"
 )
 ```
@@ -149,14 +165,29 @@ tslaPCA = stats::predict(tslaTrans,tslaSelected) #Outputs are PCA components
 utils::head(tslaPCA)
 
 #Summary of PCA results
-(tslaTrans_     = caret::preProcess(tslaSelected, method = c("BoxCox","center","scale")))
+tslaTrans_     = caret::preProcess(tslaSelected, method = c("BoxCox","center","scale"))
 propVarTslaPCA = tslaSelected %>%
                  stats::predict(tslaTrans_,.) %>%
                  stats::prcomp() %>%
                  base::summary()
 propVarTslaPCA #proportion of variance explained by each PCs
-
 ```
+
+#
+#### Fig. 2.1 Density Plots  - Tesla
+```{r dataPlotsTsla, echo=FALSE}
+transformedTsla = predict(tslaTrans_,tslaSelected)
+par(mfrow=c(2,2))
+for (i in 1:base::ncol(tslaSelected)) {
+  hist(tslaSelected[,i], breaks=20, freq=FALSE, 
+       main = base::paste("Density Plot - ",names(tslaSelected)[i],                            "(Before)"),xlab = " ")
+  hist(transformedTsla[,i], breaks=20, freq=FALSE, 
+       main = base::paste("Density Plot - ",names(transformedTsla)[i],
+                          "(After)"),xlab = " ")
+}
+```
+
+
 
 ##### 2.2.4 Data Filtering - Google
 Features with less than 100 missing values will be included by deleting corresponding rows with missing values instead.
@@ -173,23 +204,37 @@ base::names(googSelected) [6]= "log(TURNOVER)"
 ```
 
 
-##### 2.2.5 Calculate Skewness - Google
+##### 2.2.5 Calculate Skewness and Kurtosis - Google
 ```{r skewnessGoog, warning=FALSE}
 #require(e1071)
-skewValuesGoog = base::apply(googSelected,2,e1071::skewness)
+skewnessGoog = base::apply(googSelected,2,e1071::skewness)
+kurtosisGoog = base::apply(googSelected,2,e1071::kurtosis)
 ```
 
 ```{r skewnessGoogTable, warning=FALSE, echo=FALSE}
-skewValuesGoog = skewValuesGoog%>%
+skewnessGoog = skewnessGoog%>%
                base::as.data.frame() %>%
                tibble::rownames_to_column(., "features")
 
 knitr::kable(
- skewValuesTsla,
+ skewnessGoog,
  col.names = c("Features","Skewness"),
- caption   = "Table 2-4: Skewness of Selected Features - Google",
+ caption   = "Table 2-5: Skewness of Selected Features - Google",
  align     = "lccrr"
 )
+
+
+kurtosisGoog = kurtosisGoog %>%
+               base::as.data.frame() %>%
+               tibble::rownames_to_column(., "features")
+
+knitr::kable(
+ kurtosisGoog,
+ col.names = c("Features","Kurtosis"),
+ caption   = "Table 2-6: Kurtosis of Selected Features - Google",
+ align     = "lccrr"
+)
+
 ```
 
 
@@ -211,6 +256,22 @@ propVarGoogPCA = googSelected %>%
 propVarGoogPCA #proportion of variance explained by each PCs
 ```
 
+#
+#### Fig. 2.2 Density Plots  - Google
+```{r dataPlotsGoog, echo=FALSE}
+transGoog = predict(googTrans_,googSelected)
+par(mfrow=c(2,2))
+for (i in 1:base::ncol(googSelected)) {
+  hist(googSelected[,i], breaks=20, freq=FALSE, 
+       main = base::paste("Density Plot - ",names(googSelected)[i], "(After)"),
+  xlab = " ")
+  hist(transGoog[,i], breaks=20, freq=FALSE, 
+       main = base::paste("Density Plot - ",names(transGoog)[i], "(Before)"),
+  xlab = " ")
+}
+```
+
+
 
 ### 2.3 Correlation Analysis 
 >__Tesla__
@@ -221,8 +282,7 @@ corrTsla     = stats::cor(tslaSelected)
 corrplot::corrplot(corrTsla, order="hclust")
 ```
 
-#### Fig. 2.1 Correlations between features - Tesla
-
+#### Fig. 2.3 Correlations between features - Tesla
 
 >__Google__
 
@@ -232,4 +292,4 @@ corrGoog     = stats::cor(googSelected)
 corrplot::corrplot(corrGoog, order="hclust")
 ```
 
-#### Fig. 2.2 Correlations between features - Google
+#### Fig. 2.4 Correlations between features - Google
