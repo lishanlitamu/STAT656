@@ -19,7 +19,8 @@ library(e1071)
 library(data.table)
 library(dplyr)
 library(ggplot2)
-library(httr)
+library(rvest)
+library(stringr)
 
 knitr::opts_chunk$set(echo = T)
 ```
@@ -293,3 +294,54 @@ corrplot::corrplot(corrGoog, order="hclust")
 ```
 
 #### Fig. 2.4 Correlations between features - Google
+
+### 3 - News Scraping
+```{r news_scrape}
+## Define search strings on Google News
+tsla_search <- read_html("https://news.google.com/search?q=TSLA%20when%3A10y&hl=en-US&gl=US&ceid=US%3Aen")
+goog_search <- read_html("https://news.google.com/search?q=GOOG%20when%3A10y&hl=en-US&gl=US&ceid=US%3Aen")
+
+## Extract headlines
+tsla_headlines <- tsla_search %>% 
+  rvest::html_nodes("article") %>% rvest::html_text("span") %>%
+  stringr::str_split("(?<=[a-z0-9!?\\.])(?=[A-Z])") # Clean strings
+tsla_headlines <- base::sapply(tsla_headlines, function(x) x[1]) # Extract only the first elements
+
+goog_headlines <- goog_search %>% 
+  rvest::html_nodes("article") %>% rvest::html_text("span") %>%
+  stringr::str_split("(?<=[a-z0-9!?\\.])(?=[A-Z])") # Clean strings
+goog_headlines <- base::sapply(goog_headlines, function(x) x[1]) # Extract only the first elements
+
+## Extract the time since the headline
+tsla_time <- tsla_search %>% rvest::html_nodes("div article div div time") %>% rvest::html_text()
+goog_time <- goog_search %>% rvest::html_nodes("div article div div time") %>% rvest::html_text()
+
+## Create data frame
+tsla_news <- base::data.frame("Date" = tsla_time, "Headline" = tsla_headlines, stringsAsFactors = F)
+goog_news <- base::data.frame("Date" = goog_time, "Headline" = goog_headlines, stringsAsFactors = F)
+
+## Format date columns
+for (row in 1:base::nrow(tsla_news)) {
+  # If news was hours ago, set date as today
+  if (base::grepl("hours ago", tsla_news[row, ]$Date)) {tsla_news[row, ]$Date <- Sys.Date()}
+  #
+  else if (base::grepl("Yesterday", tsla_news[row, ]$Date)) {tsla_news[row, ]$Date <- Sys.Date() - 1}
+  # If news was days ago, set date as today minus the number of days
+  else if (base::grepl("days ago", tsla_news[row, ]$Date)) {tsla_news[row, ]$Date <- Sys.Date() - base::as.numeric(base::substr(tsla_news[row, ]$Date, 1, 1))}
+  # If news has a date, format it as a date
+  else {tsla_news[row, ]$Date <- base::as.Date(paste0(tsla_news[row, ]$Date, " 2020"), "%b %d %Y")}
+}
+tsla_news$Date <- base::as.Date(base::as.numeric(tsla_news$Date), origin = "1970-01-01")
+
+for (row in 1:base::nrow(goog_news)) {
+  # If news was hours ago, set date as today
+  if (base::grepl("hours ago", goog_news[row, ]$Date)) {goog_news[row, ]$Date <- Sys.Date()}
+  #
+  else if (base::grepl("Yesterday", goog_news[row, ]$Date)) {goog_news[row, ]$Date <- Sys.Date() - 1}
+  # If news was days ago, set date as today minus the number of days
+  else if (base::grepl("days ago", goog_news[row, ]$Date)) {goog_news[row, ]$Date <- Sys.Date() - base::as.numeric(base::substr(goog_news[row, ]$Date, 1, 1))}
+  # If news has a date, format it as a date
+  else {goog_news[row, ]$Date <- base::as.Date(paste0(goog_news[row, ]$Date, " 2020"), "%b %d %Y")}
+}
+goog_news$Date <- base::as.Date(base::as.numeric(goog_news$Date), origin = "1970-01-01")
+```
