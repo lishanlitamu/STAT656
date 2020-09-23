@@ -15,12 +15,16 @@ output: html_document
 library(bit64)
 library(caret)
 library(corrplot)
-library(e1071)
 library(data.table)
 library(dplyr)
+library(e1071)
 library(ggplot2)
+library(readxl)
+library(rtweet)
 library(rvest)
 library(stringr)
+library(tau)
+library(textdata)
 
 knitr::opts_chunk$set(echo = T)
 ```
@@ -42,6 +46,7 @@ goog$Date <- as.Date(goog$Date, "%m/%d/%Y")
 ```
 
 #### 1.2 Visualize data
+
 ```{r plot_data}
 ## Plot prices versus time
 tsla_plot <- ggplot2::ggplot() + 
@@ -83,7 +88,6 @@ Total number of columns: `r totalColTsla`
 
 
 ```{r naTslaKnit, echo=FALSE}
-
 knitr::kable(
  naTsla,
  col.names = c("Features","Number of Missing Values"),
@@ -174,7 +178,6 @@ propVarTslaPCA = tslaSelected %>%
 propVarTslaPCA #proportion of variance explained by each PCs
 ```
 
-#
 #### Fig. 2.1 Density Plots  - Tesla
 ```{r dataPlotsTsla, echo=FALSE}
 transformedTsla = predict(tslaTrans_,tslaSelected)
@@ -187,8 +190,6 @@ for (i in 1:base::ncol(tslaSelected)) {
                           "(After)"),xlab = " ")
 }
 ```
-
-
 
 ##### 2.2.4 Data Filtering - Google
 Features with less than 100 missing values will be included by deleting corresponding rows with missing values instead.
@@ -203,7 +204,6 @@ googSelected = goog %>%
 googSelected$TURNOVER = base::log(googSelected$TURNOVER)
 base::names(googSelected) [6]= "log(TURNOVER)"
 ```
-
 
 ##### 2.2.5 Calculate Skewness and Kurtosis - Google
 ```{r skewnessGoog, warning=FALSE}
@@ -238,7 +238,6 @@ knitr::kable(
 
 ```
 
-
 ##### 2.2.6 Data Transformation - Google
 ```{r dataTransGoog, warning=FALSE}
 #Transform the selected data
@@ -271,8 +270,6 @@ for (i in 1:base::ncol(googSelected)) {
   xlab = " ")
 }
 ```
-
-
 
 ### 2.3 Correlation Analysis 
 >__Tesla__
@@ -344,4 +341,60 @@ for (row in 1:base::nrow(goog_news)) {
   else {goog_news[row, ]$Date <- base::as.Date(paste0(goog_news[row, ]$Date, " 2020"), "%b %d %Y")}
 }
 goog_news$Date <- base::as.Date(base::as.numeric(goog_news$Date), origin = "1970-01-01")
+```
+
+### 4 - Twitter Scraping
+```{r twitter_scrape}
+## Twitter API keys and secrets
+api_key <- "zElIwld33bNohcb28j7si3aBW"
+api_secret_key <- "a5yDRmHeFpq2tpqk4u687rAyDuApzUe2ZffYir3disyqa98QGb"
+bearer_token <- "AAAAAAAAAAAAAAAAAAAAAH2iGAEAAAAApwFAjq60a%2Ba8gOG2URX2scAHOo0%3DPXz3xx1Z5i8YuqNzRt6wSAINxOkqNrArIESFlnxWCToPHhEcRH"
+access_token <- "1271553006522306568-Azxsa0o7nHOCNpvRjRdocbWPYz0D6w"
+access_token_secret <- "PwT1GB0Ogj0poevifeUShWB4lEZAODXHWfm8HyXRz2J7e"
+
+## Create Twitter token
+twitter_token <- rtweet::create_token(app = "BNC Sentiment Analysis", consumer_key = api_key, consumer_secret = api_secret_key, access_token = access_token, access_secret = access_token_secret)
+
+## Get positive and negative words from Loughran and McDonald
+positive_words <- base::data.frame(
+  readxl::read_excel("2 - Word Lists/LoughranMcDonald_SentimentWordLists_2018.xlsx", 
+                     sheet = "Positive", col_names = F))$...1
+positive_words <- positive_words$...1
+negative_words <- base::data.frame(
+  readxl::read_excel("2 - Word Lists/LoughranMcDonald_SentimentWordLists_2018.xlsx", 
+                     sheet = "Negative", col_names = F))
+negative_words <- negative_words$...1
+
+## Loop through tickers and pull tweets
+sentiment <- base::data.frame("Ticker" = base::character(),
+                              "Date" = base::as.Date(base::character()), 
+                              "Sentiment" = base::numeric(), stringsAsFactors = F)
+for (ticker in c("TSLA", "GOOG")) {
+  ## Pull tweets (this will throw an authentication page the first time)
+  ticker <- "TSLA"
+  tweets <- rtweet::search_tweets(q = base::paste0("$", ticker), n = 100000, include_rts = F, 
+                                  retryonratelimit = T)
+  
+  ## Check sentiment
+  tweets$sentiment <- base::as.numeric(NA)
+  for(row in 1:base::nrow(tweets)) {
+    values <- base::numeric()
+    for (word in base::strsplit(tweets[row, ]$text, "[[:punct:] ]")[[1]]) {
+      if (word %in% positive_words) {values <- append(values, 1)}
+      else if (word %in% negative_words) {values <- append(values, -1)}
+      else {values <- append(values, 0)}
+    }
+  tweets[row, ]$sentiment <- base::sum(values)
+  }
+  
+  tweets$sentiment <- base::round(stats::weighted.mean(tweets$sentiment, 
+                                                 w = tweets$favorite_count + tweets$favorite_count), 
+                            digits = 1)
+  tweets$created_at <- base::as.Date(tweets$created_at, "%Y-%m-%d")
+  tmp <- tweets %>% dplyr::group_by(created_at) %>% dplyr::summarize("sentiment" = base::sum(sentiment))
+  sentiment <- base::append(sentiment, tmp)
+}
+names(sentiment) <- c("TSLA", "GOOG")
+
+ggplot2::ggplot(sentiment, ggplot2::aes(x = Date, y = Sentiment, color = Ticker)) + ggplot2::geom_line() + ggplot2::ggtitle("Twitter Sentiment Over Time")
 ```
