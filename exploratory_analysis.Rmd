@@ -399,3 +399,195 @@ names(sentiment) <- c("TSLA", "GOOG")
 
 ggplot2::ggplot(sentiment, ggplot2::aes(x = Date, y = Sentiment, color = Ticker)) + ggplot2::geom_line() + ggplot2::ggtitle("Twitter Sentiment Over Time")
 ```
+
+#### 5 - Linear Regression
+##### 5.1 Data Structure
+```{r dataStructure}
+#Tsla
+str(tslaSelected)
+sapply(tslaSelected,function(x){length(unique(x))})
+
+#Goog
+str(googSelected)
+sapply(googSelected,function(x){length(unique(x))})
+```
+
+All `r ncol(tslaSelected)` selected variables in Tesla stock data are quantitative.  
+All `r ncol(googSelected)` selected variables in Google stock data are quantitative.
+
+```{r highCorr}
+#Recall highly correlated variables before making changes
+highCorrTsla = tslaSelected %>%
+  cor %>%
+  caret::findCorrelation(.8, names = TRUE)
+highCorrTsla
+corrplot::corrplot(cor(tslaSelected), order="hclust")
+
+highCorrGoog = googSelected %>%
+  cor %>%
+  caret::findCorrelation(.8, names = TRUE)
+highCorrGoog
+corrplot::corrplot(cor(googSelected), order="hclust")
+```
+
+Highly correlated features in Tesla data set are : `r highCorrTsla`.
+Highly correlated features in Google data set are : `r highCorrGoog`.
+
+Instead of removing all these features, try to calculate new quantities based on them and check the correlations of data with new features added. 
+
+```{r newVar}
+###TSLA
+tslaTemp = tslaSelected %>% 
+  dplyr::mutate(
+         PP = (PX_HIGH + PX_LOW + PX_LAST)/3, #Pivot Point
+         R1 = 2 * PP - PX_LOW,                #First resistance
+         S1 = 2 * PP - PX_HIGH,               #First support
+         R2 = PP + (PX_HIGH - PX_LOW),
+         S2 = PP - (PX_HIGH - PX_LOW),
+         R3 = PX_HIGH + 2 * (PP - PX_LOW),
+         S3 = PX_LOW - 2 * (PX_HIGH - PP),
+         diffHighLow  = PX_HIGH - PX_LOW,
+         diffLastOpen = PX_LAST - PX_OPEN,
+         stockReturn  = (PX_LAST - PX_OPEN)/PX_OPEN,
+         obv = rep(0, nrow(tslaSelected))
+         )
+  
+highCorrTsla = tslaTemp %>%
+  cor %>%
+  caret::findCorrelation(.8, names = TRUE)
+highCorrTsla
+
+corrplot::corrplot(cor(tslaTemp), order="hclust")
+
+###GOOG
+
+
+```
+Add lagged features to run linear regression analysis with past values. We'll fit time series models later. This can be a fairly good alternative for TS models, which saves us from running the stationarity test for each feature. 
+
+```{r addVariables}
+addLaggedVarF = function(feature, laggedVar, featureName,lagSize ) {
+  for (lags in 1:lagSize) { 
+    newColName = paste0(featureName, lags)
+    laggedVar = laggedVar %>%
+      dplyr::mutate(!!sym(newColName) := dplyr::lag(feature, n = lags))
+  }
+  return(laggedVar)
+}
+
+#Create lagged features. Only retain the lagged features with correlation less than 0.8
+tslaLagged = addLaggedVarF(tslaTemp$PX_VOLUME, tslaTemp, "VOLUME",10)
+tslaLagged = addLaggedVarF(tslaLagged$diffHighLow, tslaLagged, "diffHighLow",10)
+tslaLagged = addLaggedVarF(tslaLagged$diffLastOpen, tslaLagged, "diffLastOpen",10)
+tslaLagged = addLaggedVarF(tslaLagged$PX_LAST, tslaLagged, "PX_LAST",1) #used to calculate OBV
+#tslaLagged = addLaggedVarF(tslaLagged$obv, tslaLagged, "obv",1) #used to calculate OBV
+
+#Remove rows with NAs
+tslaLaggedRemoveNA = tslaLagged %>%
+  filter(.,!is.na(tslaLagged$VOLUME10)) 
+names(tslaLaggedRemoveNA)
+```
+
+On Balance Volume is calculated by adding the day's volume to a cumulative total when the security's price closes up, and subtracting the day's volume when the security's price closes down.
+
+If today's close is greater than yesterday's close then:
+OBV = Yesterday’s OBV + Today’s Volume
+
+If today’s close is less than yesterday’s close then:
+OBV = Yesterday’s OBV – Today’s Volume
+
+If today’s close is equal to yesterday’s close then:
+OBV = Yesterday’s OBV
+```{r OnBalanceVolume}
+tslaTemp2 =  tslaLaggedRemoveNA %>%
+  if (PX_LAST1 < PX_LAST){
+      mutate_at(obv = lag(obv) + PX_VOLUME)
+    } else if (PX_LAST1 > PX_LAST){ 
+      mutate_at(obv = lag(obv) - PX_VOLUME)
+    } else {
+      mutate_at(obv = lag(obv))
+    }
+
+obvF = function(yesterdayVolume, todayVolume, yesterdayPX_LAST, todayPX_LAST, obv){
+  if (yesterdayPX_LAST < todayPX_LAST){
+      mutate_at(obv = lag(obv) + todayVolume)
+    } else if (yesterdayPX_LAST > todayPX_LAST){ 
+      mutate_at(obv = lag(obv) - todayVolume)
+    } else {
+      mutate_at(obv = lag(obv))
+    }
+}
+
+#Chaikin money flow
+
+
+#Klinger Oscillator
+
+###GOOG
+```
+
+```{r removeHighCorr}
+highCorrTsla = tslaLaggedRemoveNA %>%
+  cor %>%
+  caret::findCorrelation(.8, names = TRUE)
+highCorrTsla #print highly correlated features
+
+tslaLaggedRemoveCorr = select(tslaLaggedRemoveNA, -highCorrTsla)
+
+corrplot::corrplot(cor(tslaLaggedRemoveCorr), order="hclust")
+
+
+#Calculate the 1st difference of features [feature_t - feature_(t-1)]
+
+tslaLaggedHighCorr =select(tslaLaggedRemoveNA, highCorrTsla)
+
+highCorrTslaDiff = tslaLaggedHighCorr %>%
+  apply(., 2, function(x) {diff(x)})%>%
+  dplyr::as_tibble(.) %>%
+  cor %>%
+  caret::findCorrelation(.8, names = TRUE)
+highCorrTslaDiff
+
+
+tslaDiffRemoveCorr = select(tslaLaggedHighCorr, -highCorrTslaDiff)
+names(tslaDiffRemoveCorr) = paste0("diff",names(tslaDiffRemoveCorr)) 
+
+tslaReg = cbind(tslaLaggedRemoveCorr,tslaDiffRemoveCorr) #Features for Linear Regression
+corrplot::corrplot(cor(tslaReg), order="hclust")
+
+```
+
+
+
+
+```{r dummyVar}
+....
+
+```
+
+
+
+
+##### 5.x Potential Problems
+###### 5.x.1 correlation of error term(residuals)
+###### 5.x.2 outliers
+
+
+#### 6 - Time Series Analysis
+```{r timeSeriesAnalysis}
+#Check stationarity
+cuberoot=function(x){
+    x=sign(x)*abs(x)^(1/3)
+  }
+require(graphics)
+par(mfrow=c(2,2))
+tslaTsPlot = tslaReg %>% 
+  apply(., 2, function(x) {diff(diff(cuberoot(x)))}) %>%
+  apply(., 2, ts.plot)
+
+tslaACF = tslaReg %>% 
+  apply(., 2, function(x) {diff(diff(cuberoot(x)))}) %>%
+  apply(., 2, acf)
+
+```
+
