@@ -5,22 +5,26 @@ date: "9/4/2020"
 output: html_document
 ---
 
-## Project Topic: 
+## Project Topic:
 ## Analyzing the impact of news and social media sentiment on stock prices.
 
-### 1 - General review of raw data 
+### 1 - General review of raw data
 #### 1.1 Load and clean data
 ```{r initialize, include = F}
 ## Load libraries
 library(bit64)
 library(caret)
 library(corrplot)
-library(e1071)
 library(data.table)
 library(dplyr)
+library(e1071)
 library(ggplot2)
+library(readxl)
+library(rtweet)
 library(rvest)
 library(stringr)
+library(tau)
+library(textdata)
 
 knitr::opts_chunk$set(echo = T)
 ```
@@ -42,12 +46,13 @@ goog$Date <- as.Date(goog$Date, "%m/%d/%Y")
 ```
 
 #### 1.2 Visualize data
+
 ```{r plot_data}
 ## Plot prices versus time
-tsla_plot <- ggplot2::ggplot() + 
+tsla_plot <- ggplot2::ggplot() +
   ggplot2::geom_line(data = tsla, ggplot2::aes(x = Date, y = PX_LAST)) + ggplot2::ggtitle("TSLA")
-goog_plot <- ggplot2::ggplot() + 
-  ggplot2::geom_line(data = goog, ggplot2::aes(x = Date, y = PX_LAST)) + ggplot2::ggtitle("GOOG") + 
+goog_plot <- ggplot2::ggplot() +
+  ggplot2::geom_line(data = goog, ggplot2::aes(x = Date, y = PX_LAST)) + ggplot2::ggtitle("GOOG") +
   ggplot2::scale_x_date(limits = c(base::min(tsla$Date), base::max(tsla$Date))) # Align the x-axis with TSLA
 gridExtra::grid.arrange(tsla_plot, goog_plot)
 ```
@@ -64,7 +69,7 @@ naTsla       = tsla %>%
                base::sapply(.,function(y) base::sum(base::length(base::which(base::is.na(y))))) %>%
                base::as.data.frame() %>%
                tibble::rownames_to_column(., "Features")
-              
+
 
 totalRowGoog = base::nrow(goog)
 totalColGoog = base::ncol(goog)
@@ -83,7 +88,6 @@ Total number of columns: `r totalColTsla`
 
 
 ```{r naTslaKnit, echo=FALSE}
-
 knitr::kable(
  naTsla,
  col.names = c("Features","Number of Missing Values"),
@@ -109,7 +113,7 @@ knitr::kable(
 ```
 
 
-#### 2.2 Data Transformation 
+#### 2.2 Data Transformation
 
 ##### 2.2.1 Data Filtering - Tesla
 Features with less than 100 missing values will be included by deleting corresponding rows with missing values instead.
@@ -174,20 +178,18 @@ propVarTslaPCA = tslaSelected %>%
 propVarTslaPCA #proportion of variance explained by each PCs
 ```
 
-#
 #### Fig. 2.1 Density Plots  - Tesla
 ```{r dataPlotsTsla, echo=FALSE}
 transformedTsla = predict(tslaTrans_,tslaSelected)
 par(mfrow=c(2,2))
 for (i in 1:ncol(tslaSelected)) {
-  hist(tslaSelected[,i], breaks=20, freq=FALSE, 
+  hist(tslaSelected[,i], breaks=20, freq=FALSE,
        main = paste("Density Plot - ",names(tslaSelected)[i],                            "(Before)"),xlab = " ")
-  hist(transformedTsla[,i], breaks=20, freq=FALSE, 
+  hist(transformedTsla[,i], breaks=20, freq=FALSE,
        main = paste("Density Plot - ",names(transformedTsla)[i],
                           "(After)"),xlab = " ")
 }
 ```
-
 
 ##### 2.2.4 Data Filtering - Google
 Features with less than 100 missing values will be included by deleting corresponding rows with missing values instead.
@@ -202,7 +204,6 @@ googSelected = goog %>%
 googSelected$TURNOVER = base::log(googSelected$TURNOVER)
 base::names(googSelected) [6]= "log(TURNOVER)"
 ```
-
 
 ##### 2.2.5 Calculate Skewness and Kurtosis - Google
 ```{r skewnessGoog, warning=FALSE}
@@ -237,7 +238,6 @@ knitr::kable(
 
 ```
 
-
 ##### 2.2.6 Data Transformation - Google
 ```{r dataTransGoog, warning=FALSE}
 #Transform the selected data
@@ -262,18 +262,16 @@ propVarGoogPCA #proportion of variance explained by each PCs
 transGoog = predict(googTrans_,googSelected)
 par(mfrow=c(2,2))
 for (i in 1:ncol(googSelected)) {
-  hist(googSelected[,i], breaks=20, freq=FALSE, 
+  hist(googSelected[,i], breaks=20, freq=FALSE,
        main = paste("Density Plot - ",names(googSelected)[i], "(After)"),
   xlab = " ")
-  hist(transGoog[,i], breaks=20, freq=FALSE, 
+  hist(transGoog[,i], breaks=20, freq=FALSE,
        main = paste("Density Plot - ",names(transGoog)[i], "(Before)"),
   xlab = " ")
 }
 ```
 
-
-
-### 2.3 Correlation Analysis 
+### 2.3 Correlation Analysis
 >__Tesla__
 
 ```{r findCorrelationTsla, warning=FALSE}
@@ -302,12 +300,12 @@ tsla_search <- read_html("https://news.google.com/search?q=TSLA%20when%3A10y&hl=
 goog_search <- read_html("https://news.google.com/search?q=GOOG%20when%3A10y&hl=en-US&gl=US&ceid=US%3Aen")
 
 ## Extract headlines
-tsla_headlines <- tsla_search %>% 
+tsla_headlines <- tsla_search %>%
   rvest::html_nodes("article") %>% rvest::html_text("span") %>%
   stringr::str_split("(?<=[a-z0-9!?\\.])(?=[A-Z])") # Clean strings
 tsla_headlines <- base::sapply(tsla_headlines, function(x) x[1]) # Extract only the first elements
 
-goog_headlines <- goog_search %>% 
+goog_headlines <- goog_search %>%
   rvest::html_nodes("article") %>% rvest::html_text("span") %>%
   stringr::str_split("(?<=[a-z0-9!?\\.])(?=[A-Z])") # Clean strings
 goog_headlines <- base::sapply(goog_headlines, function(x) x[1]) # Extract only the first elements
@@ -346,215 +344,58 @@ for (row in 1:base::nrow(goog_news)) {
 goog_news$Date <- base::as.Date(base::as.numeric(goog_news$Date), origin = "1970-01-01")
 ```
 
-#### 4 - Linear Regression
-##### 4.1 Data Structure
-```{r dataStructure}
-#Tsla
-str(tslaSelected)
-sapply(tslaSelected,function(x){length(unique(x))})
+### 4 - Twitter Scraping
+```{r twitter_scrape}
+## Twitter API keys and secrets
+api_key <- "zElIwld33bNohcb28j7si3aBW"
+api_secret_key <- "a5yDRmHeFpq2tpqk4u687rAyDuApzUe2ZffYir3disyqa98QGb"
+bearer_token <- "AAAAAAAAAAAAAAAAAAAAAH2iGAEAAAAApwFAjq60a%2Ba8gOG2URX2scAHOo0%3DPXz3xx1Z5i8YuqNzRt6wSAINxOkqNrArIESFlnxWCToPHhEcRH"
+access_token <- "1271553006522306568-Azxsa0o7nHOCNpvRjRdocbWPYz0D6w"
+access_token_secret <- "PwT1GB0Ogj0poevifeUShWB4lEZAODXHWfm8HyXRz2J7e"
 
-#Goog
-str(googSelected)
-sapply(googSelected,function(x){length(unique(x))})
-```
+## Create Twitter token
+twitter_token <- rtweet::create_token(app = "BNC Sentiment Analysis", consumer_key = api_key, consumer_secret = api_secret_key, access_token = access_token, access_secret = access_token_secret)
 
-All `r ncol(tslaSelected)` selected variables in Tesla stock data are quantitative.  
-All `r ncol(googSelected)` selected variables in Google stock data are quantitative.
+## Get positive and negative words from Loughran and McDonald
+positive_words <- base::data.frame(
+  readxl::read_excel("2 - Word Lists/LoughranMcDonald_SentimentWordLists_2018.xlsx",
+                     sheet = "Positive", col_names = F))$...1
+positive_words <- positive_words$...1
+negative_words <- base::data.frame(
+  readxl::read_excel("2 - Word Lists/LoughranMcDonald_SentimentWordLists_2018.xlsx",
+                     sheet = "Negative", col_names = F))
+negative_words <- negative_words$...1
 
-```{r highCorr}
-#Recall highly correlated variables before making changes
-highCorrTsla = tslaSelected %>%
-  cor %>%
-  caret::findCorrelation(.8, names = TRUE)
-highCorrTsla
-corrplot::corrplot(cor(tslaSelected), order="hclust")
+## Loop through tickers and pull tweets
+sentiment <- base::data.frame("Ticker" = base::character(),
+                              "Date" = base::as.Date(base::character()),
+                              "Sentiment" = base::numeric(), stringsAsFactors = F)
+for (ticker in c("TSLA", "GOOG")) {
+  ## Pull tweets (this will throw an authentication page the first time)
+  ticker <- "TSLA"
+  tweets <- rtweet::search_tweets(q = base::paste0("$", ticker), n = 100000, include_rts = F,
+                                  retryonratelimit = T)
 
-highCorrGoog = googSelected %>%
-  cor %>%
-  caret::findCorrelation(.8, names = TRUE)
-highCorrGoog
-corrplot::corrplot(cor(googSelected), order="hclust")
-```
-
-Highly correlated features in Tesla data set are : `r highCorrTsla`.
-Highly correlated features in Google data set are : `r highCorrGoog`.
-
-Instead of removing all these features, try to calculate new quantities based on them and check the correlations of data with new features added. 
-
-```{r newVar}
-###TSLA
-tslaTemp = tslaSelected %>% 
-  dplyr::mutate(
-         PP = (PX_HIGH + PX_LOW + PX_LAST)/3, #Pivot Point
-         R1 = 2 * PP - PX_LOW,                #First resistance
-         S1 = 2 * PP - PX_HIGH,               #First support
-         R2 = PP + (PX_HIGH - PX_LOW),
-         S2 = PP - (PX_HIGH - PX_LOW),
-         R3 = PX_HIGH + 2 * (PP - PX_LOW),
-         S3 = PX_LOW - 2 * (PX_HIGH - PP),
-         diffHighLow  = PX_HIGH - PX_LOW,
-         diffLastOpen = PX_LAST - PX_OPEN,
-         stockReturn  = (PX_LAST - PX_OPEN)/PX_OPEN,
-         obv = rep(0, nrow(tslaSelected))
-         )
-  
-highCorrTsla = tslaTemp %>%
-  cor %>%
-  caret::findCorrelation(.8, names = TRUE)
-highCorrTsla
-
-corrplot::corrplot(cor(tslaTemp), order="hclust")
-
-###GOOG
-
-
-```
-Add lagged features to run linear regression analysis with past values. We'll fit time series models later. This can be a fairly good alternative for TS models, which saves us from running the stationarity test for each feature. 
-
-```{r addVariables}
-addLaggedVarF = function(feature, laggedVar, featureName,lagSize ) {
-  for (lags in 1:lagSize) { 
-    newColName = paste0(featureName, lags)
-    laggedVar = laggedVar %>%
-      dplyr::mutate(!!sym(newColName) := dplyr::lag(feature, n = lags))
-  }
-  return(laggedVar)
-}
-
-#Create lagged features. Only retain the lagged features with correlation less than 0.8
-tslaLagged = addLaggedVarF(tslaTemp$PX_VOLUME, tslaTemp, "VOLUME",10)
-tslaLagged = addLaggedVarF(tslaLagged$diffHighLow, tslaLagged, "diffHighLow",10)
-tslaLagged = addLaggedVarF(tslaLagged$diffLastOpen, tslaLagged, "diffLastOpen",10)
-tslaLagged = addLaggedVarF(tslaLagged$PX_LAST, tslaLagged, "PX_LAST",1) #used to calculate OBV
-#tslaLagged = addLaggedVarF(tslaLagged$obv, tslaLagged, "obv",1) #used to calculate OBV
-
-#Remove rows with NAs
-tslaLaggedRemoveNA = tslaLagged %>%
-  filter(.,!is.na(tslaLagged$VOLUME10)) 
-names(tslaLaggedRemoveNA)
-```
-
-On Balance Volume is calculated by adding the day's volume to a cumulative total when the security's price closes up, and subtracting the day's volume when the security's price closes down.
-
-If today's close is greater than yesterday's close then:
-OBV = Yesterday’s OBV + Today’s Volume
-
-If today’s close is less than yesterday’s close then:
-OBV = Yesterday’s OBV – Today’s Volume
-
-If today’s close is equal to yesterday’s close then:
-OBV = Yesterday’s OBV
-```{r OnBalanceVolume}
-tslaTemp2 =  tslaLaggedRemoveNA %>%
-  if (PX_LAST1 < PX_LAST){
-      mutate_at(obv = lag(obv) + PX_VOLUME)
-    } else if (PX_LAST1 > PX_LAST){ 
-      mutate_at(obv = lag(obv) - PX_VOLUME)
-    } else {
-      mutate_at(obv = lag(obv))
+  ## Check sentiment
+  tweets$sentiment <- base::as.numeric(NA)
+  for(row in 1:base::nrow(tweets)) {
+    values <- base::numeric()
+    for (word in base::strsplit(tweets[row, ]$text, "[[:punct:] ]")[[1]]) {
+      if (word %in% positive_words) {values <- append(values, 1)}
+      else if (word %in% negative_words) {values <- append(values, -1)}
+      else {values <- append(values, 0)}
     }
-
-obvF = function(yesterdayVolume, todayVolume, yesterdayPX_LAST, todayPX_LAST, obv){
-  if (yesterdayPX_LAST < todayPX_LAST){
-      mutate_at(obv = lag(obv) + todayVolume)
-    } else if (yesterdayPX_LAST > todayPX_LAST){ 
-      mutate_at(obv = lag(obv) - todayVolume)
-    } else {
-      mutate_at(obv = lag(obv))
-    }
-}
-
-#Chaikin money flow
-
-
-#Klinger Oscillator
-
-###GOOG
-```
-
-```{r removeHighCorr}
-highCorrTsla = tslaLaggedRemoveNA %>%
-  cor %>%
-  caret::findCorrelation(.8, names = TRUE)
-highCorrTsla #print highly correlated features
-
-tslaLaggedRemoveCorr = select(tslaLaggedRemoveNA, -highCorrTsla)
-
-corrplot::corrplot(cor(tslaLaggedRemoveCorr), order="hclust")
-
-
-#Calculate the 1st difference of features [feature_t - feature_(t-1)]
-
-tslaLaggedHighCorr =select(tslaLaggedRemoveNA, highCorrTsla)
-
-highCorrTslaDiff = tslaLaggedHighCorr %>%
-  apply(., 2, function(x) {diff(x)})%>%
-  dplyr::as_tibble(.) %>%
-  cor %>%
-  caret::findCorrelation(.8, names = TRUE)
-highCorrTslaDiff
-
-
-tslaDiffRemoveCorr = select(tslaLaggedHighCorr, -highCorrTslaDiff)
-names(tslaDiffRemoveCorr) = paste0("diff",names(tslaDiffRemoveCorr)) 
-
-tslaReg = cbind(tslaLaggedRemoveCorr,tslaDiffRemoveCorr) #Features for Linear Regression
-corrplot::corrplot(cor(tslaReg), order="hclust")
-
-```
-
-
-
-
-```{r dummyVar}
-....
-
-```
-
-
-
-
-##### 4.2 Google
-
-
-##### 4.x Potential Problems
-###### 4.x.1 correlation of error term(residuals)
-###### 4.x.2 outliers
-
-
-#### 5 - Time Series Analysis
-
-```{r timeSeriesAnalysis}
-#Check stationarity
-cuberoot=function(x){
-    x=sign(x)*abs(x)^(1/3)
+  tweets[row, ]$sentiment <- base::sum(values)
   }
-require(graphics)
-par(mfrow=c(2,2))
-tslaTsPlot = tslaReg %>% 
-  apply(., 2, function(x) {diff(diff(cuberoot(x)))}) %>%
-  apply(., 2, ts.plot)
 
-tslaACF = tslaReg %>% 
-  apply(., 2, function(x) {diff(diff(cuberoot(x)))}) %>%
-  apply(., 2, acf)
+  tweets$sentiment <- base::round(stats::weighted.mean(tweets$sentiment,
+                                                 w = tweets$favorite_count + tweets$favorite_count),
+                            digits = 1)
+  tweets$created_at <- base::as.Date(tweets$created_at, "%Y-%m-%d")
+  tmp <- tweets %>% dplyr::group_by(created_at) %>% dplyr::summarize("sentiment" = base::sum(sentiment))
+  sentiment <- base::append(sentiment, tmp)
+}
+names(sentiment) <- c("TSLA", "GOOG")
 
-```
-
-#### 6 - K-means clustering (Unsupervised learning)
-Goal: Use clustering techniques to figure out whether the current pool of features can supply enough information to build a classifier for stock price trend. 
-
-Step 1: 
-Response variable is defined as a qualitative variable: 1 - Increased stock price (PX_LAST), 0 - Decreased stock price;
-Cluster features into two groups. (K=2)
-
-Step 2:
-Calculate the percentage of increased stock prices in each cluster. (K=2)
-
-Conclusion: If the percentage of one cluster is much larger than the other one, a classifier based on all used features should have a fairly good performance. 
-
-
-```{r K-meansClustering}
-
-
+ggplot2::ggplot(sentiment, ggplot2::aes(x = Date, y = Sentiment, color = Ticker)) + ggplot2::geom_line() + ggplot2::ggtitle("Twitter Sentiment Over Time")
 ```
