@@ -25,7 +25,10 @@ library(rvest)
 library(stringr)
 library(tau)
 library(textdata)
-
+library(plot3D)   #PCs plot
+library(RcppRoll) #CMF
+library(TTR)      #Calculate Indicators: EMA,SMA,RSI
+library(leaps)    #Stepwise Model Selection
 knitr::opts_chunk$set(echo = T)
 ```
 
@@ -176,6 +179,23 @@ propVarTslaPCA = tslaSelected %>%
                  stats::prcomp() %>%
                  summary()
 propVarTslaPCA #proportion of variance explained by each PCs
+
+#Check extreme observations via PCA
+
+ggplot(data = tslaPCA)+
+  geom_point(aes(x = PC1, y= PC2))
+
+ggplot(data = tslaPCA)+
+  geom_point(aes(x = PC3, y= PC2))
+
+ggplot(data = tslaPCA)+
+  geom_point(aes(x = PC1, y= PC3))
+
+
+plot3D::scatter3D(tslaPCA$PC1, tslaPCA$PC2, tslaPCA$PC3, pch = 16,  
+                  theta = 20, phi = 20, main = "PCA - Tesla", xlab = "PC1", 
+                  ylab ="PC2", zlab = "PC3", bty = "g", ticktype = "detailed")
+
 ```
 
 #### Fig. 2.1 Density Plots  - Tesla
@@ -254,6 +274,21 @@ propVarGoogPCA = googSelected %>%
                  stats::prcomp() %>%
                  summary()
 propVarGoogPCA #proportion of variance explained by each PCs
+
+#Check extreme observations via PCA
+ggplot(data = googPCA)+
+  geom_point(aes(x = PC1, y= PC2))
+
+ggplot(data = googPCA)+
+  geom_point(aes(x = PC3, y= PC2))
+
+ggplot(data = googPCA)+
+  geom_point(aes(x = PC1, y= PC3))
+
+plot3D::scatter3D(googPCA$PC1, googPCA$PC2, googPCA$PC3, pch = 16,  
+                  theta = 20, phi = 20, main = "PCA - Alphabet", xlab = "PC1", 
+                  ylab ="PC2", zlab = "PC3", bty = "g", ticktype = "detailed")
+
 ```
 
 #
@@ -404,11 +439,11 @@ ggplot2::ggplot(sentiment, ggplot2::aes(x = Date, y = Sentiment, color = Ticker)
 ##### 5.1 Data Structure
 ```{r dataStructure}
 #Tsla
-str(tslaSelected)
+#str(tslaSelected)
 sapply(tslaSelected,function(x){length(unique(x))})
 
 #Goog
-str(googSelected)
+#str(googSelected)
 sapply(googSelected,function(x){length(unique(x))})
 ```
 
@@ -433,60 +468,58 @@ corrplot::corrplot(cor(googSelected), order="hclust")
 Highly correlated features in Tesla data set are : `r highCorrTsla`.
 Highly correlated features in Google data set are : `r highCorrGoog`.
 
-Instead of removing all these features, try to calculate new quantities based on them and check the correlations of data with new features added. 
+Instead of removing all these features, try to calculate new quantities based on them and check the correlations again with new features added. 
+
+##### Pivot Point, Resistance Levels, Support Levels 
+The pivot point itself is simply the average of the high, low and closing prices from the previous trading day.
+On the subsequent day, trading above the pivot point is thought to indicate ongoing bullish sentiment, while trading below the pivot point indicates bearish sentiment.
+
+###### Calculation
+* Resistance Level 3 = Previous Day High + 2(Pivot – Previous Day Low)
+* Resistance Level 2 = Pivot + (Resistance Level 1 – Support Level 1)
+* Resistance Level 1 = (Pivot x 2) – Previous Day Low
+* Pivot = Previous Day (High + Low + Close) / 3
+* Support Level 1 = (Pivot x 2) – Previous Day High
+* Support Level 2 = Pivot – (Resistance Level 1 – Support Level 1)
+* Support Level 3 = Previous Day Low – 2(Previous Day High – Pivot)
 
 ```{r newVar}
 ###TSLA
 tslaTemp = tslaSelected %>% 
   dplyr::mutate(
-         PP = (PX_HIGH + PX_LOW + PX_LAST)/3, #Pivot Point
-         R1 = 2 * PP - PX_LOW,                #First resistance
-         S1 = 2 * PP - PX_HIGH,               #First support
-         R2 = PP + (PX_HIGH - PX_LOW),
-         S2 = PP - (PX_HIGH - PX_LOW),
-         R3 = PX_HIGH + 2 * (PP - PX_LOW),
-         S3 = PX_LOW - 2 * (PX_HIGH - PP),
+         PP = lag((PX_HIGH + PX_LOW + PX_LAST)/3), #Previous Day (High + Low + Close) / 3
+         R1 = 2 * PP - lag(PX_LOW),                #(Pivot x 2) – Previous Day Low
+         S1 = 2 * PP - lag(PX_HIGH),               #(Pivot x 2) – Previous Day High
+         R2 = PP + (R1 - S1),                      #Pivot + (R1 – S1)
+         S2 = PP - (R1 - S1),                      #Pivot - (R1 – S1)
+         R3 = lag(PX_HIGH) + 2 * (PP - lag(PX_LOW)),    
+         #R3= Previous Day High + 2(PP – Previous Day Low)
+         S3 = lag(PX_LOW) - 2 * (lag(PX_HIGH) - PP),
+         #S3= Previous Day Low – 2(Previous Day High – Pivot)
          diffHighLow  = PX_HIGH - PX_LOW,
          diffLastOpen = PX_LAST - PX_OPEN,
-         stockReturn  = (PX_LAST - PX_OPEN)/PX_OPEN,
-         obv = rep(0, nrow(tslaSelected))
+         stockReturn  = (PX_LAST - PX_OPEN)/PX_OPEN
          )
-  
-highCorrTsla = tslaTemp %>%
-  cor %>%
-  caret::findCorrelation(.8, names = TRUE)
-highCorrTsla
 
-corrplot::corrplot(cor(tslaTemp), order="hclust")
+highCorrF = function(dta, thred){
+  #Find highly correlated features
+  highCorr = dta %>%
+  cor %>%
+  caret::findCorrelation(thred, names = TRUE)
+  return(highCorr)
+}
+
+
+hclustPlotF = function(dta) {
+  #Correlation Plot
+  corrplot::corrplot(cor(dta), order="hclust")
+}
 
 ###GOOG
 
 
 ```
-Add lagged features to run linear regression analysis with past values. We'll fit time series models later. This can be a fairly good alternative for TS models, which saves us from running the stationarity test for each feature. 
 
-```{r addVariables}
-addLaggedVarF = function(feature, laggedVar, featureName,lagSize ) {
-  for (lags in 1:lagSize) { 
-    newColName = paste0(featureName, lags)
-    laggedVar = laggedVar %>%
-      dplyr::mutate(!!sym(newColName) := dplyr::lag(feature, n = lags))
-  }
-  return(laggedVar)
-}
-
-#Create lagged features. Only retain the lagged features with correlation less than 0.8
-tslaLagged = addLaggedVarF(tslaTemp$PX_VOLUME, tslaTemp, "VOLUME",10)
-tslaLagged = addLaggedVarF(tslaLagged$diffHighLow, tslaLagged, "diffHighLow",10)
-tslaLagged = addLaggedVarF(tslaLagged$diffLastOpen, tslaLagged, "diffLastOpen",10)
-tslaLagged = addLaggedVarF(tslaLagged$PX_LAST, tslaLagged, "PX_LAST",1) #used to calculate OBV
-#tslaLagged = addLaggedVarF(tslaLagged$obv, tslaLagged, "obv",1) #used to calculate OBV
-
-#Remove rows with NAs
-tslaLaggedRemoveNA = tslaLagged %>%
-  filter(.,!is.na(tslaLagged$VOLUME10)) 
-names(tslaLaggedRemoveNA)
-```
 
 On Balance Volume is calculated by adding the day's volume to a cumulative total when the security's price closes up, and subtracting the day's volume when the security's price closes down.
 
@@ -499,73 +532,176 @@ OBV = Yesterday’s OBV – Today’s Volume
 If today’s close is equal to yesterday’s close then:
 OBV = Yesterday’s OBV
 ```{r OnBalanceVolume}
-tslaTemp2 =  tslaLaggedRemoveNA %>%
-  if (PX_LAST1 < PX_LAST){
-      mutate_at(obv = lag(obv) + PX_VOLUME)
-    } else if (PX_LAST1 > PX_LAST){ 
-      mutate_at(obv = lag(obv) - PX_VOLUME)
-    } else {
-      mutate_at(obv = lag(obv))
-    }
 
-obvF = function(yesterdayVolume, todayVolume, yesterdayPX_LAST, todayPX_LAST, obv){
-  if (yesterdayPX_LAST < todayPX_LAST){
-      mutate_at(obv = lag(obv) + todayVolume)
-    } else if (yesterdayPX_LAST > todayPX_LAST){ 
-      mutate_at(obv = lag(obv) - todayVolume)
-    } else {
-      mutate_at(obv = lag(obv))
-    }
-}
-
-#Chaikin money flow
+tslaLaggedAddOBV = tslaTemp %>% 
+  mutate(obv = TTR::OBV(PX_LAST, PX_VOLUME))
+```
 
 
-#Klinger Oscillator
+#####Chaikin money flow
+Description:
+Chaikin Money Flow (CMF) developed by Marc Chaikin is a volume-weighted average of accumulation and distribution over a specified period. The standard CMF period is 21 days. The principle behind the Chaikin Money Flow is the nearer the closing price is to the high, the more accumulation has taken place. Conversely, the nearer the closing price is to the low, the more distribution has taken place. If the price action consistently closes above the bar's midpoint on increasing volume, the Chaikin Money Flow will be positive. Conversely, if the price action consistently closes below the bar's midpoint on increasing volume, the Chaikin Money Flow will be a negative value.
+
+How this indicator works:
+* A CMF value above the zero line is a sign of strength in the market, and a value below the zero line is a sign of weakness in the market.
+* Wait for the CMF to confirm the breakout direction of price action through trend lines or through support and resistance lines. For example, if a price breaks upward through resistance, wait for the CMF to have a positive value to confirm the breakout direction.
+* A CMF sell signal occurs when price action develops a higher high into overbought zones, with the CMF diverging with a lower high and beginning to fall.
+* A CMF buy signal occurs when price action develops a lower low into oversold zones, with the CMF diverging with a higher low and beginning to rise.
+
+Calculation:
+CMF            = n-day Sum of [(((C - L) - (H - C)) / (H - L)) x Vol] / n-day Sum of Vol
+cmfNumerator   = n-day Sum of [(((C - L) - (H - C)) / (H - L)) x Vol]
+cmfDenominator = n-day Sum of Vol
+
+Where:
+n = number of periods, typically 21
+H = high
+L = low
+C = close
+Vol = volume
+
+```{r chaikinMoneyFlow}
+
+daysCMF = 21
+tslalaggedAddCMF = tslaLaggedAddOBV %>%
+  mutate(cmf = TTR::CMF(tslaLaggedAddOBV[,c("PX_HIGH","PX_LOW","PX_LAST")], PX_VOLUME, n = daysCMF))
+
+```
+#####Exponential Moving Average (EMA)
+
+An exponential moving average (EMA) is a type of moving average (MA) that places a greater weight and significance on the most recent data points. The exponential moving average is also referred to as the exponentially weighted moving average. An exponentially weighted moving average reacts more significantly to recent price changes than a simple moving average (SMA), which applies an equal weight to all observations in the period.
+
+* EMA = Closing price x multiplier + EMA (previous day) x (1-multiplier)
+
+######Limitations of the EMA
+It is unclear whether or not more emphasis should be placed on the most recent days in the time period. Many traders believe that new data better reflects the current trend of the security. At the same time, others feel that overweighting recent dates creates a bias that leads to more false alarms.
+
+Similarly, the EMA relies wholly on historical data. Many economists believe that markets are efficient, which means that current market prices already reflect all available information. If markets are indeed efficient, using historical data should tell us nothing about the future direction of asset prices.
+```{r exponentialMovingAverage}
+daysEMA = 10 #EMA lengths
+tslalaggedAddEMA = tslalaggedAddCMF %>%
+  mutate(ema = TTR::EMA(tslalaggedAddCMF$PX_LAST,daysEMA))
 
 ###GOOG
 ```
 
+```{r relativeStrengthIndex(RSI)}
+###Tsla
+daysRSI = 14
+tslalaggedAddRSI = tslalaggedAddEMA %>%
+  mutate(rsi = TTR::RSI(lag(PX_LAST), n=daysRSI, maType="WMA", wts=lag(PX_VOLUME)))
+###GOOG
+```
+
+
+Add lagged values of features. We'll fit time series models later. This can be a fairly good alternative for TS models, which saves us from running the stationarity test for each feature. 
+
+```{r addVariables}
+addLaggedVarF = function(feature, dataForModification, featureName,lagSize ) {
+  for (lags in 1:lagSize) { 
+    newColName = paste0(featureName, lags)
+    dataForModification = dataForModification %>%
+      dplyr::mutate(!!sym(newColName) := dplyr::lag(feature, n = lags))
+  }
+  return(dataForModification)
+}
+
+#Create lagged features for model fitting (use as an alternative to Time Series Model)
+lags10Days = 10
+lags21Days = 21
+tslaLagged = addLaggedVarF(tslalaggedAddRSI$PX_HIGH, tslalaggedAddRSI, "PX_HIGH",lags)
+for (j in 2:ncol(tslalaggedAddRSI)) {
+  tslaLagged = addLaggedVarF(tslalaggedAddRSI[,j], tslaLagged, names(tslalaggedAddRSI)[j],lags10Days)
+}
+
+```
+
+Up till now, we added lagged features, OBV, CMF,EMA and RSI to our data. Need to clean it up before calculate the correlation of updated data by deleting rows with NAs. (Missing values are simultaneously created as we added past values of features to the data. Thus, we use listwise deletion instead of imputation.)
+
+```{r cleanUp}
+tslaReg = tslaLagged %>% na.omit()
+```
+
+```{r dummyVarForLogisticRegression}
+tslaRegAddLevels = tslaReg %>%
+  mutate(stockReturnDummy = factor(ifelse(stockReturn > 0, "Increased", "Decreased"))) %>%
+  mutate(aboveR1PreviousDay = factor(ifelse(lag(PX_HIGH > R1), "Yes", "No"))) %>%
+  mutate(aboveR2PreviousDay = factor(ifelse(lag(PX_HIGH > R2), "Yes", "No"))) %>%
+  mutate(aboveR3PreviousDay = factor(ifelse(lag(PX_HIGH > R3), "Yes", "No"))) %>%
+  mutate(belowS1PreviousDay = factor(ifelse(lag(PX_LOW  < S1), "Yes", "No"))) %>%
+  mutate(belowS2PreviousDay = factor(ifelse(lag(PX_LOW  < S2), "Yes", "No"))) %>%
+  mutate(belowS3PreviousDay = factor(ifelse(lag(PX_LOW  < S3), "Yes", "No"))) %>%
+  select(stockReturnDummy,aboveR1PreviousDay, aboveR2PreviousDay, aboveR3PreviousDay, belowS1PreviousDay, belowS2PreviousDay, belowS3PreviousDay)
+
+tslaDummyModel = caret::dummyVars(~ ., data = tslaRegAddLevels, fullRank = TRUE)
+
+tslaRegDummyVar = as_tibble(predict(tslaDummyModel, tslaRegAddLevels))
+YtslaDummy = tslaRegDummyVar$stockReturnDummy.Increased
+XtslaDummy = select(tslaRegDummyVar, - stockReturnDummy.Increased)
+
+tslaRegFull = tslaReg %>%
+  mutate(YtslaDummy) %>%
+  mutate(XtslaDummy) %>% 
+  dplyr::select(-(136:205)) %>% #Drop PP, R1, R2, R3, S1, S2, S3 and their lagged values
+  dplyr::select(-stockReturn) %>%  #replaced by stockReturnDummy
+  na.omit()
+#names(tslaRegFull) #Find positions of PP, R1, R2, R3, S1, S2, S3 and their lagged values
+
+```
+
 ```{r removeHighCorr}
-highCorrTsla = tslaLaggedRemoveNA %>%
-  cor %>%
-  caret::findCorrelation(.8, names = TRUE)
-highCorrTsla #print highly correlated features
+highCorrTsla = highCorrF(tslaRegFull,0.8)
 
-tslaLaggedRemoveCorr = select(tslaLaggedRemoveNA, -highCorrTsla)
+tslaRegFullRemoveCorr = select(tslaRegFull, -highCorrTsla)
 
-corrplot::corrplot(cor(tslaLaggedRemoveCorr), order="hclust")
+hclustPlotF(tslaRegFullRemoveCorr)
+```
 
+Many features in our data are not normally distributed, which violates the normality assumption for LDA. Thus, we'll fit our data with a logistic regression model. 
 
-#Calculate the 1st difference of features [feature_t - feature_(t-1)]
+```{r logisticRegressionAllData}
+YtslaFull = tslaRegFullRemoveCorr$YtslaDummy
+XtslaFull = tslaRegFullRemoveCorr %>% select(-YtslaDummy, -diffHighLow,-diffLastOpen, -PX_VOLUME) # To predict day_0 stock trend, use stock price/volume data that happened before day_0.
 
-tslaLaggedHighCorr =select(tslaLaggedRemoveNA, highCorrTsla)
+names(tslaRegFullRemoveCorr)
 
-highCorrTslaDiff = tslaLaggedHighCorr %>%
-  apply(., 2, function(x) {diff(x)})%>%
-  dplyr::as_tibble(.) %>%
-  cor %>%
-  caret::findCorrelation(.8, names = TRUE)
-highCorrTslaDiff
+trControl = trainControl(method = 'none')
+tslaOutLogistic = train(x = XtslaFull, y = YtslaFull, method = 'glm', trControl = trControl)
 
+summary(tslaOutLogistic)
 
-tslaDiffRemoveCorr = select(tslaLaggedHighCorr, -highCorrTslaDiff)
-names(tslaDiffRemoveCorr) = paste0("diff",names(tslaDiffRemoveCorr)) 
+#Forward Selection
+tslaOutForward = leaps::regsubsets(x = XtslaFull, y = YtslaFull, nvmax=ncol(XtslaFull), method='forward')
+tslaSumForward      = summary(tslaOutForward)
+tslamodelForward    = tslaSumForward$which[which.min(tslaSumForward$bic),]
 
-tslaReg = cbind(tslaLaggedRemoveCorr,tslaDiffRemoveCorr) #Features for Linear Regression
-corrplot::corrplot(cor(tslaReg), order="hclust")
+(tslaSelectedForward = tslamodelForward[-1])
 
+#Use selected features from Forward Selection to fit another logistic model
+XtslaForward = as_tibble(select(XtslaFull, rsi, cmf, cmf10))
+
+tslaOutLogistic2 = caret::train(x = XtslaForward, y = YtslaFull, method = 'lm', trControl = trControl)
+summary(tslaOutLogistic2)
+
+```
+The selected logistic model has very low R-squared but all coefficients 
+```{r dataSplit}
+#training set
+#validation set
+#test set
+```
+```{r logisticRegressionAfterDataSplit}
+#Select tuning parameters with validation set
+#Fit logistic models with training set
 ```
 
 
+```{r modelPerformance}
+#Calculate test errors
 
-
-```{r dummyVar}
-....
+#confusion matrix
 
 ```
-
-
 
 
 ##### 5.x Potential Problems
@@ -573,7 +709,7 @@ corrplot::corrplot(cor(tslaReg), order="hclust")
 ###### 5.x.2 outliers
 
 
-#### 6 - Time Series Analysis
+##### 6 - Time Series Analysis
 ```{r timeSeriesAnalysis}
 #Check stationarity
 cuberoot=function(x){
@@ -588,6 +724,6 @@ tslaTsPlot = tslaReg %>%
 tslaACF = tslaReg %>% 
   apply(., 2, function(x) {diff(diff(cuberoot(x)))}) %>%
   apply(., 2, acf)
-
 ```
 
+##### 7 - Clustering
