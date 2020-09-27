@@ -5,10 +5,10 @@ date: "9/4/2020"
 output: html_document
 ---
 
-## Project Topic: 
+## Project Topic:
 ## Analyzing the impact of news and social media sentiment on stock prices.
 
-### 1 - General review of raw data 
+### 1 - General review of raw data
 #### 1.1 Load and clean data
 ```{r initialize, include = F}
 ## Load libraries
@@ -50,10 +50,10 @@ goog$Date <- as.Date(goog$Date, "%m/%d/%Y")
 
 ```{r plot_data}
 ## Plot prices versus time
-tsla_plot <- ggplot2::ggplot() + 
+tsla_plot <- ggplot2::ggplot() +
   ggplot2::geom_line(data = tsla, ggplot2::aes(x = Date, y = PX_LAST)) + ggplot2::ggtitle("TSLA")
-goog_plot <- ggplot2::ggplot() + 
-  ggplot2::geom_line(data = goog, ggplot2::aes(x = Date, y = PX_LAST)) + ggplot2::ggtitle("GOOG") + 
+goog_plot <- ggplot2::ggplot() +
+  ggplot2::geom_line(data = goog, ggplot2::aes(x = Date, y = PX_LAST)) + ggplot2::ggtitle("GOOG") +
   ggplot2::scale_x_date(limits = c(base::min(tsla$Date), base::max(tsla$Date))) # Align the x-axis with TSLA
 gridExtra::grid.arrange(tsla_plot, goog_plot)
 ```
@@ -70,7 +70,7 @@ naTsla       = tsla %>%
                base::sapply(.,function(y) base::sum(base::length(base::which(base::is.na(y))))) %>%
                base::as.data.frame() %>%
                tibble::rownames_to_column(., "Features")
-              
+
 
 totalRowGoog = base::nrow(goog)
 totalColGoog = base::ncol(goog)
@@ -114,32 +114,32 @@ knitr::kable(
 ```
 
 
-#### 2.2 Data Transformation 
+#### 2.2 Data Transformation
 
 ##### 2.2.1 Data Filtering - Tesla
 Features with less than 100 missing values will be included by deleting corresponding rows with missing values instead.
 ```{r filterTsla, warning=FALSE}
 #Select a subset of original data for data transformation and PCA
 tslaSelected = tsla %>%
-  .[,(base::which(naTsla[,2] < 100))] %>%
-  .[!(base::apply(.,1, function(y){any(is.na(y))})),] %>%
+  .[,(which(naTsla[,2] < 100))] %>%
+  .[!(apply(.,1, function(y){any(is.na(y))})),] %>%
   .[,-1] #remove dates in the first column
 
 #Apply Log-transformation on tslaSelected$TURNOVER to avoid producing NaN in skewness computation
-tslaSelected$TURNOVER = base::log(tslaSelected$TURNOVER)
+tslaSelected$TURNOVER = log(tslaSelected$TURNOVER)
 base::names(tslaSelected) [6]= "log(TURNOVER)"
 ```
 
 ##### 2.2.2 Calculate Skewness and Kurtosis - Tesla
 ```{r skewnessTsla, warning=FALSE}
 require(e1071)
-skewnessTsla = base::apply(tslaSelected,2,e1071::skewness)
-kurtosisTsla   = base::apply(tslaSelected,2,e1071::kurtosis)
+skewnessTsla = apply(tslaSelected,2,e1071::skewness)
+kurtosisTsla   = apply(tslaSelected,2,e1071::kurtosis)
 ```
 
 ```{r skewnessTslaTable, warning=FALSE, echo=FALSE}
 skewnessTsla = skewnessTsla %>%
-               base::as.data.frame() %>%
+               as.data.frame() %>%
                tibble::rownames_to_column(., "features")
 
 knitr::kable(
@@ -150,7 +150,7 @@ knitr::kable(
 )
 
 kurtosisTsla = kurtosisTsla %>%
-               base::as.data.frame() %>%
+               as.data.frame() %>%
                tibble::rownames_to_column(., "features")
 
 knitr::kable(
@@ -175,7 +175,7 @@ tslaTrans_     = caret::preProcess(tslaSelected, method = c("BoxCox","center","s
 propVarTslaPCA = tslaSelected %>%
                  stats::predict(tslaTrans_,.) %>%
                  stats::prcomp() %>%
-                 base::summary()
+                 summary()
 propVarTslaPCA #proportion of variance explained by each PCs
 ```
 
@@ -183,11 +183,11 @@ propVarTslaPCA #proportion of variance explained by each PCs
 ```{r dataPlotsTsla, echo=FALSE}
 transformedTsla = predict(tslaTrans_,tslaSelected)
 par(mfrow=c(2,2))
-for (i in 1:base::ncol(tslaSelected)) {
-  hist(tslaSelected[,i], breaks=20, freq=FALSE, 
-       main = base::paste("Density Plot - ",names(tslaSelected)[i],                            "(Before)"),xlab = " ")
-  hist(transformedTsla[,i], breaks=20, freq=FALSE, 
-       main = base::paste("Density Plot - ",names(transformedTsla)[i],
+for (i in 1:ncol(tslaSelected)) {
+  hist(tslaSelected[,i], breaks=20, freq=FALSE,
+       main = paste("Density Plot - ",names(tslaSelected)[i],                            "(Before)"),xlab = " ")
+  hist(transformedTsla[,i], breaks=20, freq=FALSE,
+       main = paste("Density Plot - ",names(transformedTsla)[i],
                           "(After)"),xlab = " ")
 }
 ```
@@ -197,8 +197,8 @@ Features with less than 100 missing values will be included by deleting correspo
 ```{r filterGoog, warning=FALSE}
 #Select a subset of original data for data transformation and PCA
 googSelected = goog %>%
-  .[,(base::which(naGoog[,2] < 100))] %>%
-  .[!(base::apply(.,1, function(y){any(is.na(y))})),] %>%
+  .[,(which(naGoog[,2] < 100))] %>%
+  .[!(apply(.,1, function(y){any(is.na(y))})),] %>%
   .[,-1] #remove dates in the first column
 
 #Apply Log-transformation on googSelected$TURNOVER
@@ -209,13 +209,13 @@ base::names(googSelected) [6]= "log(TURNOVER)"
 ##### 2.2.5 Calculate Skewness and Kurtosis - Google
 ```{r skewnessGoog, warning=FALSE}
 #require(e1071)
-skewnessGoog = base::apply(googSelected,2,e1071::skewness)
-kurtosisGoog = base::apply(googSelected,2,e1071::kurtosis)
+skewnessGoog = apply(googSelected,2,e1071::skewness)
+kurtosisGoog = apply(googSelected,2,e1071::kurtosis)
 ```
 
 ```{r skewnessGoogTable, warning=FALSE, echo=FALSE}
 skewnessGoog = skewnessGoog%>%
-               base::as.data.frame() %>%
+               as.data.frame() %>%
                tibble::rownames_to_column(., "features")
 
 knitr::kable(
@@ -227,7 +227,7 @@ knitr::kable(
 
 
 kurtosisGoog = kurtosisGoog %>%
-               base::as.data.frame() %>%
+               as.data.frame() %>%
                tibble::rownames_to_column(., "features")
 
 knitr::kable(
@@ -253,7 +253,7 @@ utils::head(googPCA)
 propVarGoogPCA = googSelected %>%
                  stats::predict(googTrans_,.) %>%
                  stats::prcomp() %>%
-                 base::summary()
+                 summary()
 propVarGoogPCA #proportion of variance explained by each PCs
 ```
 
@@ -262,17 +262,17 @@ propVarGoogPCA #proportion of variance explained by each PCs
 ```{r dataPlotsGoog, echo=FALSE}
 transGoog = predict(googTrans_,googSelected)
 par(mfrow=c(2,2))
-for (i in 1:base::ncol(googSelected)) {
-  hist(googSelected[,i], breaks=20, freq=FALSE, 
-       main = base::paste("Density Plot - ",names(googSelected)[i], "(After)"),
+for (i in 1:ncol(googSelected)) {
+  hist(googSelected[,i], breaks=20, freq=FALSE,
+       main = paste("Density Plot - ",names(googSelected)[i], "(After)"),
   xlab = " ")
-  hist(transGoog[,i], breaks=20, freq=FALSE, 
-       main = base::paste("Density Plot - ",names(transGoog)[i], "(Before)"),
+  hist(transGoog[,i], breaks=20, freq=FALSE,
+       main = paste("Density Plot - ",names(transGoog)[i], "(Before)"),
   xlab = " ")
 }
 ```
 
-### 2.3 Correlation Analysis 
+### 2.3 Correlation Analysis
 >__Tesla__
 
 ```{r findCorrelationTsla, warning=FALSE}
@@ -293,6 +293,7 @@ corrplot::corrplot(corrGoog, order="hclust")
 
 #### Fig. 2.4 Correlations between features - Google
 
+
 ### 3 - News Scraping
 #### 3.1 Google News
 
@@ -302,12 +303,12 @@ tsla_search <- read_html("https://news.google.com/search?q=TSLA%20when%3A10y&hl=
 goog_search <- read_html("https://news.google.com/search?q=GOOG%20when%3A10y&hl=en-US&gl=US&ceid=US%3Aen")
 
 ## Extract headlines
-tsla_headlines <- tsla_search %>% 
+tsla_headlines <- tsla_search %>%
   rvest::html_nodes("article") %>% rvest::html_text("span") %>%
   stringr::str_split("(?<=[a-z0-9!?\\.])(?=[A-Z])") # Clean strings
 tsla_headlines <- base::sapply(tsla_headlines, function(x) x[1]) # Extract only the first elements
 
-goog_headlines <- goog_search %>% 
+goog_headlines <- goog_search %>%
   rvest::html_nodes("article") %>% rvest::html_text("span") %>%
   stringr::str_split("(?<=[a-z0-9!?\\.])(?=[A-Z])") # Clean strings
 goog_headlines <- base::sapply(goog_headlines, function(x) x[1]) # Extract only the first elements
@@ -379,24 +380,24 @@ twitter_token <- rtweet::create_token(app = "BNC Sentiment Analysis", consumer_k
 
 ## Get positive and negative words from Loughran and McDonald
 positive_words <- base::data.frame(
-  readxl::read_excel("2 - Word Lists/LoughranMcDonald_SentimentWordLists_2018.xlsx", 
+  readxl::read_excel("2 - Word Lists/LoughranMcDonald_SentimentWordLists_2018.xlsx",
                      sheet = "Positive", col_names = F))$...1
 positive_words <- positive_words$...1
 negative_words <- base::data.frame(
-  readxl::read_excel("2 - Word Lists/LoughranMcDonald_SentimentWordLists_2018.xlsx", 
+  readxl::read_excel("2 - Word Lists/LoughranMcDonald_SentimentWordLists_2018.xlsx",
                      sheet = "Negative", col_names = F))
 negative_words <- negative_words$...1
 
 ## Loop through tickers and pull tweets
 sentiment <- base::data.frame("Ticker" = base::character(),
-                              "Date" = base::as.Date(base::character()), 
+                              "Date" = base::as.Date(base::character()),
                               "Sentiment" = base::numeric(), stringsAsFactors = F)
 for (ticker in c("TSLA", "GOOG")) {
   ## Pull tweets (this will throw an authentication page the first time)
   ticker <- "TSLA"
-  tweets <- rtweet::search_tweets(q = base::paste0("$", ticker), n = 100000, include_rts = F, 
+  tweets <- rtweet::search_tweets(q = base::paste0("$", ticker), n = 100000, include_rts = F,
                                   retryonratelimit = T)
-  
+
   ## Check sentiment
   tweets$sentiment <- base::as.numeric(NA)
   for(row in 1:base::nrow(tweets)) {
@@ -408,9 +409,9 @@ for (ticker in c("TSLA", "GOOG")) {
     }
   tweets[row, ]$sentiment <- base::sum(values)
   }
-  
-  tweets$sentiment <- base::round(stats::weighted.mean(tweets$sentiment, 
-                                                 w = tweets$favorite_count + tweets$favorite_count), 
+
+  tweets$sentiment <- base::round(stats::weighted.mean(tweets$sentiment,
+                                                 w = tweets$favorite_count + tweets$favorite_count),
                             digits = 1)
   tweets$created_at <- base::as.Date(tweets$created_at, "%Y-%m-%d")
   tmp <- tweets %>% dplyr::group_by(created_at) %>% dplyr::summarize("sentiment" = base::sum(sentiment))
@@ -420,3 +421,195 @@ names(sentiment) <- c("TSLA", "GOOG")
 
 ggplot2::ggplot(sentiment, ggplot2::aes(x = Date, y = Sentiment, color = Ticker)) + ggplot2::geom_line() + ggplot2::ggtitle("Twitter Sentiment Over Time")
 ```
+
+#### 5 - Linear Regression
+##### 5.1 Data Structure
+```{r dataStructure}
+#Tsla
+str(tslaSelected)
+sapply(tslaSelected,function(x){length(unique(x))})
+
+#Goog
+str(googSelected)
+sapply(googSelected,function(x){length(unique(x))})
+```
+
+All `r ncol(tslaSelected)` selected variables in Tesla stock data are quantitative.  
+All `r ncol(googSelected)` selected variables in Google stock data are quantitative.
+
+```{r highCorr}
+#Recall highly correlated variables before making changes
+highCorrTsla = tslaSelected %>%
+  cor %>%
+  caret::findCorrelation(.8, names = TRUE)
+highCorrTsla
+corrplot::corrplot(cor(tslaSelected), order="hclust")
+
+highCorrGoog = googSelected %>%
+  cor %>%
+  caret::findCorrelation(.8, names = TRUE)
+highCorrGoog
+corrplot::corrplot(cor(googSelected), order="hclust")
+```
+
+Highly correlated features in Tesla data set are : `r highCorrTsla`.
+Highly correlated features in Google data set are : `r highCorrGoog`.
+
+Instead of removing all these features, try to calculate new quantities based on them and check the correlations of data with new features added. 
+
+```{r newVar}
+###TSLA
+tslaTemp = tslaSelected %>% 
+  dplyr::mutate(
+         PP = (PX_HIGH + PX_LOW + PX_LAST)/3, #Pivot Point
+         R1 = 2 * PP - PX_LOW,                #First resistance
+         S1 = 2 * PP - PX_HIGH,               #First support
+         R2 = PP + (PX_HIGH - PX_LOW),
+         S2 = PP - (PX_HIGH - PX_LOW),
+         R3 = PX_HIGH + 2 * (PP - PX_LOW),
+         S3 = PX_LOW - 2 * (PX_HIGH - PP),
+         diffHighLow  = PX_HIGH - PX_LOW,
+         diffLastOpen = PX_LAST - PX_OPEN,
+         stockReturn  = (PX_LAST - PX_OPEN)/PX_OPEN,
+         obv = rep(0, nrow(tslaSelected))
+         )
+  
+highCorrTsla = tslaTemp %>%
+  cor %>%
+  caret::findCorrelation(.8, names = TRUE)
+highCorrTsla
+
+corrplot::corrplot(cor(tslaTemp), order="hclust")
+
+###GOOG
+
+
+```
+Add lagged features to run linear regression analysis with past values. We'll fit time series models later. This can be a fairly good alternative for TS models, which saves us from running the stationarity test for each feature. 
+
+```{r addVariables}
+addLaggedVarF = function(feature, laggedVar, featureName,lagSize ) {
+  for (lags in 1:lagSize) { 
+    newColName = paste0(featureName, lags)
+    laggedVar = laggedVar %>%
+      dplyr::mutate(!!sym(newColName) := dplyr::lag(feature, n = lags))
+  }
+  return(laggedVar)
+}
+
+#Create lagged features. Only retain the lagged features with correlation less than 0.8
+tslaLagged = addLaggedVarF(tslaTemp$PX_VOLUME, tslaTemp, "VOLUME",10)
+tslaLagged = addLaggedVarF(tslaLagged$diffHighLow, tslaLagged, "diffHighLow",10)
+tslaLagged = addLaggedVarF(tslaLagged$diffLastOpen, tslaLagged, "diffLastOpen",10)
+tslaLagged = addLaggedVarF(tslaLagged$PX_LAST, tslaLagged, "PX_LAST",1) #used to calculate OBV
+#tslaLagged = addLaggedVarF(tslaLagged$obv, tslaLagged, "obv",1) #used to calculate OBV
+
+#Remove rows with NAs
+tslaLaggedRemoveNA = tslaLagged %>%
+  filter(.,!is.na(tslaLagged$VOLUME10)) 
+names(tslaLaggedRemoveNA)
+```
+
+On Balance Volume is calculated by adding the day's volume to a cumulative total when the security's price closes up, and subtracting the day's volume when the security's price closes down.
+
+If today's close is greater than yesterday's close then:
+OBV = Yesterday’s OBV + Today’s Volume
+
+If today’s close is less than yesterday’s close then:
+OBV = Yesterday’s OBV – Today’s Volume
+
+If today’s close is equal to yesterday’s close then:
+OBV = Yesterday’s OBV
+```{r OnBalanceVolume}
+tslaTemp2 =  tslaLaggedRemoveNA %>%
+  if (PX_LAST1 < PX_LAST){
+      mutate_at(obv = lag(obv) + PX_VOLUME)
+    } else if (PX_LAST1 > PX_LAST){ 
+      mutate_at(obv = lag(obv) - PX_VOLUME)
+    } else {
+      mutate_at(obv = lag(obv))
+    }
+
+obvF = function(yesterdayVolume, todayVolume, yesterdayPX_LAST, todayPX_LAST, obv){
+  if (yesterdayPX_LAST < todayPX_LAST){
+      mutate_at(obv = lag(obv) + todayVolume)
+    } else if (yesterdayPX_LAST > todayPX_LAST){ 
+      mutate_at(obv = lag(obv) - todayVolume)
+    } else {
+      mutate_at(obv = lag(obv))
+    }
+}
+
+#Chaikin money flow
+
+
+#Klinger Oscillator
+
+###GOOG
+```
+
+```{r removeHighCorr}
+highCorrTsla = tslaLaggedRemoveNA %>%
+  cor %>%
+  caret::findCorrelation(.8, names = TRUE)
+highCorrTsla #print highly correlated features
+
+tslaLaggedRemoveCorr = select(tslaLaggedRemoveNA, -highCorrTsla)
+
+corrplot::corrplot(cor(tslaLaggedRemoveCorr), order="hclust")
+
+
+#Calculate the 1st difference of features [feature_t - feature_(t-1)]
+
+tslaLaggedHighCorr =select(tslaLaggedRemoveNA, highCorrTsla)
+
+highCorrTslaDiff = tslaLaggedHighCorr %>%
+  apply(., 2, function(x) {diff(x)})%>%
+  dplyr::as_tibble(.) %>%
+  cor %>%
+  caret::findCorrelation(.8, names = TRUE)
+highCorrTslaDiff
+
+
+tslaDiffRemoveCorr = select(tslaLaggedHighCorr, -highCorrTslaDiff)
+names(tslaDiffRemoveCorr) = paste0("diff",names(tslaDiffRemoveCorr)) 
+
+tslaReg = cbind(tslaLaggedRemoveCorr,tslaDiffRemoveCorr) #Features for Linear Regression
+corrplot::corrplot(cor(tslaReg), order="hclust")
+
+```
+
+
+
+
+```{r dummyVar}
+....
+
+```
+
+
+
+
+##### 5.x Potential Problems
+###### 5.x.1 correlation of error term(residuals)
+###### 5.x.2 outliers
+
+
+#### 6 - Time Series Analysis
+```{r timeSeriesAnalysis}
+#Check stationarity
+cuberoot=function(x){
+    x=sign(x)*abs(x)^(1/3)
+  }
+require(graphics)
+par(mfrow=c(2,2))
+tslaTsPlot = tslaReg %>% 
+  apply(., 2, function(x) {diff(diff(cuberoot(x)))}) %>%
+  apply(., 2, ts.plot)
+
+tslaACF = tslaReg %>% 
+  apply(., 2, function(x) {diff(diff(cuberoot(x)))}) %>%
+  apply(., 2, acf)
+
+```
+
