@@ -12,24 +12,25 @@ output: html_document
 #### 1.1 Load and clean data
 ```{r initialize, include = F}
 ## Load libraries
-library(bit64)
+library(bit64) # To read raw data
 library(caret)
 library(corrplot)
-library(data.table)
+library(data.table) # Faster CSV reader than base
 library(dplyr)
 library(e1071)
-library(ggplot2)
-library(newsanchor)
+library(ggplot2) # General plotting
+library(newsanchor) # News API scrape
 library(readxl)
-library(rtweet)
+library(rtweet) # Twitter scrape
 library(rvest)
-library(stringr)
+library(stringr) # Goggle news scrape
 library(tau)
 library(textdata)
 library(plot3D)   #PCs plot
 library(RcppRoll) #CMF
 library(TTR)      #Calculate Indicators: EMA,SMA,RSI
 library(leaps)    #Stepwise Model Selection
+library(zoo) # Interpolation
 knitr::opts_chunk$set(echo = T)
 ```
 
@@ -292,7 +293,6 @@ plot3D::scatter3D(googPCA$PC1, googPCA$PC2, googPCA$PC3, pch = 16,
 
 ```
 
-#
 #### Fig. 2.2 Density Plots  - Google
 ```{r dataPlotsGoog, echo=FALSE}
 transGoog = predict(googTrans_,googSelected)
@@ -327,7 +327,6 @@ corrplot::corrplot(corrGoog, order="hclust")
 ```
 
 #### Fig. 2.4 Correlations between features - Google
-
 
 ### 3 - News Scraping
 #### 3.1 Google News
@@ -402,6 +401,7 @@ goog_news <- base::data.frame("Date" = goog_search[["results_df"]][["published_a
 ```
 
 ### 4 - Twitter Scraping
+
 ```{r twitter_scrape}
 ## Twitter API keys and secrets
 api_key <- "zElIwld33bNohcb28j7si3aBW"
@@ -471,6 +471,34 @@ sapply(googSelected,function(x){length(unique(x))})
 
 All `r ncol(tslaSelected)` selected variables in Tesla stock data are quantitative.  
 All `r ncol(googSelected)` selected variables in Google stock data are quantitative.
+
+``` {r interpolation}
+## TSLA
+## Run linear interpolations
+tmp <- zoo::na.approx(tsla[, base::c(14:22, 24:26)])
+
+## Create empty matrix as placeholder for non-interpolated rows
+row_diff <- base::nrow(tsla) - base::nrow(tmp)
+empty <- base::matrix(base::rep(NA, row_diff * base::ncol(tmp)), nrow = row_diff, ncol = base::ncol(tmp))
+base::colnames(empty) <- base::colnames(tmp)  
+tmp <- base::rbind(tmp, empty)
+
+## Replace original data with interpolation
+tsla[, base::c(14:22, 24:26)] <- tmp
+
+## GOOG
+## Run linear interpolations
+tmp <- zoo::na.approx(goog[, 11:23])
+
+## Create empty matrix as placeholder for non-interpolated rows
+row_diff <- base::nrow(goog) - base::nrow(tmp)
+empty <- base::matrix(base::rep(NA, row_diff * base::ncol(tmp)), nrow = row_diff, ncol = base::ncol(tmp))
+base::colnames(empty) <- base::colnames(tmp)  
+tmp <- base::rbind(tmp, empty)
+
+## Replace original data with interpolation
+goog[, 11:23] <- tmp
+```
 
 ```{r highCorr}
 #Recall highly correlated variables before making changes
@@ -542,7 +570,6 @@ hclustPlotF = function(dta) {
 
 ```
 
-
 On Balance Volume is calculated by adding the day's volume to a cumulative total when the security's price closes up, and subtracting the day's volume when the security's price closes down.
 
 If today's close is greater than yesterday's close then:
@@ -553,12 +580,11 @@ OBV = Yesterday’s OBV – Today’s Volume
 
 If today’s close is equal to yesterday’s close then:
 OBV = Yesterday’s OBV
-```{r OnBalanceVolume}
 
+```{r OnBalanceVolume}
 tslaLaggedAddOBV = tslaTemp %>% 
   mutate(obv = TTR::OBV(PX_LAST, PX_VOLUME))
 ```
-
 
 #####Chaikin money flow
 Description:
@@ -589,6 +615,7 @@ tslalaggedAddCMF = tslaLaggedAddOBV %>%
   mutate(cmf = TTR::CMF(tslaLaggedAddOBV[,c("PX_HIGH","PX_LOW","PX_LAST")], PX_VOLUME, n = daysCMF))
 
 ```
+
 #####Exponential Moving Average (EMA)
 
 An exponential moving average (EMA) is a type of moving average (MA) that places a greater weight and significance on the most recent data points. The exponential moving average is also referred to as the exponentially weighted moving average. An exponentially weighted moving average reacts more significantly to recent price changes than a simple moving average (SMA), which applies an equal weight to all observations in the period.
@@ -599,6 +626,7 @@ An exponential moving average (EMA) is a type of moving average (MA) that places
 It is unclear whether or not more emphasis should be placed on the most recent days in the time period. Many traders believe that new data better reflects the current trend of the security. At the same time, others feel that overweighting recent dates creates a bias that leads to more false alarms.
 
 Similarly, the EMA relies wholly on historical data. Many economists believe that markets are efficient, which means that current market prices already reflect all available information. If markets are indeed efficient, using historical data should tell us nothing about the future direction of asset prices.
+
 ```{r exponentialMovingAverage}
 daysEMA = 10 #EMA lengths
 tslalaggedAddEMA = tslalaggedAddCMF %>%
@@ -614,7 +642,6 @@ tslalaggedAddRSI = tslalaggedAddEMA %>%
   mutate(rsi = TTR::RSI(lag(PX_LAST), n=daysRSI, maType="WMA", wts=lag(PX_VOLUME)))
 ###GOOG
 ```
-
 
 Add lagged values of features. We'll fit time series models later. This can be a fairly good alternative for TS models, which saves us from running the stationarity test for each feature. 
 
@@ -706,7 +733,9 @@ tslaOutLogistic2 = caret::train(x = XtslaForward, y = YtslaFull, method = 'lm', 
 summary(tslaOutLogistic2)
 
 ```
+
 The selected logistic model has very low R-squared but all coefficients 
+
 ```{r dataSplit}
 #training set
 #validation set
@@ -716,7 +745,6 @@ The selected logistic model has very low R-squared but all coefficients
 #Select tuning parameters with validation set
 #Fit logistic models with training set
 ```
-
 
 ```{r modelPerformance}
 #Calculate test errors
