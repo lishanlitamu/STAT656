@@ -663,16 +663,82 @@ for (j in 2:ncol(tslalaggedAddRSI)) {
   tslaLagged = addLaggedVarF(tslalaggedAddRSI[,j], tslaLagged, names(tslalaggedAddRSI)[j],lags10Days)
 }
 
+
+addDiffVarF = function(dataForModification,nColumn) {
+  #"tslaSelected" is created to remove features with too many missing values from the original data
+  #Purpose: Take the first difference of features in "tslaSelected"
+  diffFeature = as_tibble(matrix(rep(0,((nrow(dataForModification)-1)*nColumn)),ncol = nColumn))
+  featureName = names(dataForModification)[1:nColumn]
+  
+  for (j in 1:nColumn) {
+    diffFeature[,j] = as_tibble(matrix(diff(dataForModification[,j]), ncol = 1))
+    names(diffFeature)[j] = paste0(featureName[j],"_diff")
+  }
+  
+ dataForModification_ = dataForModification[2:nrow(dataForModification),]
+ laggedDiff = cbind(dataForModification_,diffFeature)
+ return(laggedDiff)
+}
+
+tslaLaggedDiff =  addDiffVarF(tslaLagged,ncol(tslaSelected))
+
 ```
 
 Up till now, we added lagged features, OBV, CMF,EMA and RSI to our data. Need to clean it up before calculate the correlation of updated data by deleting rows with NAs. (Missing values are simultaneously created as we added past values of features to the data. Thus, we use listwise deletion instead of imputation.)
 
-```{r cleanUp}
-tslaReg = tslaLagged %>% na.omit()
+```{r cleanUpForPCA}
+tslaReg = tslaLaggedDiff %>%
+  select(-names(tslaLaggedDiff)[1:20]) %>% 
+  #Our goal is to predict tomorrow's stock trend by using data collected by today or/and in the past. So the supervisor(stockReturnDummy) should lead all features at least one day.
+  #For instance, instead of using "PX_HIGH" to predict "stockReturnDummy", we should use "PX_HIGH1".
+  na.omit()
+```
+
+```{r newPCA}
+
+#Transform the selected data
+(tslaRegTrans = caret::preProcess(tslaReg, method = c("BoxCox","center","scale","pca")))
+
+#Apply the transformations("BoxCox","center","scale","pca")
+tslaRegPCA = stats::predict(tslaRegTrans,tslaReg) #Outputs are PCA components
+utils::head(tslaRegPCA)
+
+#Summary of PCA results
+tslaRegTrans_     = caret::preProcess(tslaReg, method = c("BoxCox","center","scale"))
+propVarTslaRegPCA = tslaReg %>%
+                 stats::predict(tslaRegTrans_,.) %>%
+                 stats::prcomp() %>%
+                 summary()
+propVarTslaRegPCA #proportion of variance explained by each PCs
+
+#Check extreme observations via PCA
+
+ggplot(data = tslaRegPCA)+
+  geom_point(aes(x = PC1, y= PC2),color = ifelse(tslaReg$stockReturn < 0,'red','green'))
+
+ggplot(data = tslaRegPCA)+
+  geom_point(aes(x = PC3, y= PC2),color = ifelse(tslaReg$stockReturn < 0,'red','green'))
+
+ggplot(data = tslaRegPCA)+
+  geom_point(aes(x = PC1, y= PC3),color = ifelse(tslaReg$stockReturn < 0,'red','green'))
+
+
+plot3D::scatter3D(tslaRegPCA$PC1, tslaRegPCA$PC2, tslaRegPCA$PC3, pch = 16,  
+                  theta = 20, phi = 20, main = "PCA - Tesla", xlab = "PC1", 
+                  ylab ="PC2", zlab = "PC3", bty = "g", ticktype = "detailed",color = ifelse(tslaReg$stockReturn < 0,'red','green'))
+#outliers
+
+```
+
+```{r cleanUpForLogisticRegression}
+tslaLogReg = tslaLaggedDiff %>%
+  na.omit()
 ```
 
 ```{r dummyVarForLogisticRegression}
-tslaRegAddLevels = tslaReg %>%
+#hist(tslaReg$stockReturn, breaks=20, freq=FALSE,main = paste("Density Plot - ",names(tslaReg$stockReturn)),xlab = " ") # stock return is normally distributed.
+
+tslaLogRegAddLevels = tslaLogReg %>%
   mutate(stockReturnDummy = factor(ifelse(stockReturn > 0, "Increased", "Decreased"))) %>%
   mutate(aboveR1PreviousDay = factor(ifelse(lag(PX_HIGH > R1), "Yes", "No"))) %>%
   mutate(aboveR2PreviousDay = factor(ifelse(lag(PX_HIGH > R2), "Yes", "No"))) %>%
@@ -680,39 +746,45 @@ tslaRegAddLevels = tslaReg %>%
   mutate(belowS1PreviousDay = factor(ifelse(lag(PX_LOW  < S1), "Yes", "No"))) %>%
   mutate(belowS2PreviousDay = factor(ifelse(lag(PX_LOW  < S2), "Yes", "No"))) %>%
   mutate(belowS3PreviousDay = factor(ifelse(lag(PX_LOW  < S3), "Yes", "No"))) %>%
-  select(stockReturnDummy,aboveR1PreviousDay, aboveR2PreviousDay, aboveR3PreviousDay, belowS1PreviousDay, belowS2PreviousDay, belowS3PreviousDay)
+  select(stockReturnDummy,aboveR1PreviousDay, aboveR2PreviousDay, aboveR3PreviousDay, belowS1PreviousDay, belowS2PreviousDay, belowS3PreviousDay)                   
 
-tslaDummyModel = caret::dummyVars(~ ., data = tslaRegAddLevels, fullRank = TRUE)
+  
+tslaDummyModel = caret::dummyVars(~ ., data = tslaLogRegAddLevels, fullRank = TRUE)
 
-tslaRegDummyVar = as_tibble(predict(tslaDummyModel, tslaRegAddLevels))
-YtslaDummy = tslaRegDummyVar$stockReturnDummy.Increased
-XtslaDummy = select(tslaRegDummyVar, - stockReturnDummy.Increased)
+tslaLogRegDummyVar = as_tibble(predict(tslaDummyModel, tslaLogRegAddLevels))
+YtslaDummy = tslaLogRegDummyVar$stockReturnDummy.Increased
+XtslaDummy = select(tslaLogRegDummyVar, - stockReturnDummy.Increased)
 
-tslaRegFull = tslaReg %>%
+tslaLogRegFull = tslaLogReg %>%
   mutate(YtslaDummy) %>%
   mutate(XtslaDummy) %>% 
   dplyr::select(-(136:205)) %>% #Drop PP, R1, R2, R3, S1, S2, S3 and their lagged values
+  #names(tslaLogRegFull) #Find positions of PP, R1, R2, R3, S1, S2, S3 and their lagged values
   dplyr::select(-stockReturn) %>%  #replaced by stockReturnDummy
+  select(-names(tslaLogReg)[1:20]) %>%
+  #Our goal is to predict tomorrow's stock trend by using data collected by today or/and in the past. So the supervisor(stockReturnDummy) should lead all features at least one day.
+  #For instance, instead of using "PX_HIGH" to predict "stockReturnDummy", we should use "PX_HIGH1".
   na.omit()
-#names(tslaRegFull) #Find positions of PP, R1, R2, R3, S1, S2, S3 and their lagged values
+
+
 
 ```
 
 ```{r removeHighCorr}
-highCorrTsla = highCorrF(tslaRegFull,0.8)
+highCorrTsla = highCorrF(tslaLogRegFull,0.8)
 
-tslaRegFullRemoveCorr = select(tslaRegFull, -highCorrTsla)
+tslaLogRegFullRemoveCorr = select(tslaLogRegFull, -highCorrTsla)
 
-hclustPlotF(tslaRegFullRemoveCorr)
+hclustPlotF(tslaLogRegFullRemoveCorr)
 ```
 
 Many features in our data are not normally distributed, which violates the normality assumption for LDA. Thus, we'll fit our data with a logistic regression model. 
 
 ```{r logisticRegressionAllData}
-YtslaFull = tslaRegFullRemoveCorr$YtslaDummy
-XtslaFull = tslaRegFullRemoveCorr %>% select(-YtslaDummy, -diffHighLow,-diffLastOpen, -PX_VOLUME) # To predict day_0 stock trend, use stock price/volume data that happened before day_0.
+YtslaFull = tslaLogRegFullRemoveCorr$YtslaDummy
+XtslaFull = tslaLogRegFullRemoveCorr %>% select(-YtslaDummy) # To predict day_0 stock trend, use stock price/volume data that happened before day_0.
 
-names(tslaRegFullRemoveCorr)
+#names(tslaRegFullRemoveCorr)
 
 trControl = trainControl(method = 'none')
 tslaOutLogistic = train(x = XtslaFull, y = YtslaFull, method = 'glm', trControl = trControl)
@@ -726,8 +798,9 @@ tslamodelForward    = tslaSumForward$which[which.min(tslaSumForward$bic),]
 
 (tslaSelectedForward = tslamodelForward[-1])
 
+#####################################################################################
 #Use selected features from Forward Selection to fit another logistic model
-XtslaForward = as_tibble(select(XtslaFull, rsi, cmf, cmf10))
+XtslaForward = as_tibble(select(XtslaFull, diffHighLow2  , diffLastOpen1,ASK_diff, cmf10))
 
 tslaOutLogistic2 = caret::train(x = XtslaForward, y = YtslaFull, method = 'lm', trControl = trControl)
 summary(tslaOutLogistic2)
