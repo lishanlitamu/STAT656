@@ -62,8 +62,38 @@ goog_plot <- ggplot2::ggplot() +
 gridExtra::grid.arrange(tsla_plot, goog_plot)
 ```
 
-### 2 - Data Preprocessing
+### 2 - Data Preprocessing (Missingness and Collinearity)
 #### 2.1 Count the number of Missing Values in each feature
+
+As we have both daily and quarterly updated features aligned in the original data set, quarterly updated features contains mainly missing values. Instead of deleting quarterly updated features, missing values are interpolated between quarters.   
+
+``` {r interpolation}
+## TSLA
+## Run linear interpolations
+tmp <- zoo::na.approx(tsla[, base::c(14:22, 24:26)])
+
+## Create empty matrix as placeholder for non-interpolated rows
+row_diff <- base::nrow(tsla) - base::nrow(tmp)
+empty <- base::matrix(base::rep(NA, row_diff * base::ncol(tmp)), nrow = row_diff, ncol = base::ncol(tmp))
+base::colnames(empty) <- base::colnames(tmp)  
+tmp <- base::rbind(tmp, empty)
+
+## Replace original data with interpolation
+tsla[, base::c(14:22, 24:26)] <- tmp
+
+## GOOG
+## Run linear interpolations
+tmp <- zoo::na.approx(goog[, 11:23])
+
+## Create empty matrix as placeholder for non-interpolated rows
+row_diff <- base::nrow(goog) - base::nrow(tmp)
+empty <- base::matrix(base::rep(NA, row_diff * base::ncol(tmp)), nrow = row_diff, ncol = base::ncol(tmp))
+base::colnames(empty) <- base::colnames(tmp)  
+tmp <- base::rbind(tmp, empty)
+
+## Replace original data with interpolation
+goog[, 11:23] <- tmp
+```
 
 ```{r numNA, warning=FALSE}
 require(dplyr)
@@ -307,7 +337,7 @@ for (i in 1:ncol(googSelected)) {
 }
 ```
 
-### 2.3 Correlation Analysis
+#### 2.3 Correlation Analysis
 >__Tesla__
 
 ```{r findCorrelationTsla, warning=FALSE}
@@ -457,8 +487,10 @@ names(sentiment) <- c("TSLA", "GOOG")
 ggplot2::ggplot(sentiment, ggplot2::aes(x = Date, y = Sentiment, color = Ticker)) + ggplot2::geom_line() + ggplot2::ggtitle("Twitter Sentiment Over Time")
 ```
 
-#### 5 - Linear Regression
-##### 5.1 Data Structure
+### 5 - PCA Regression
+#### 5.1 Data Preprocessing
+
+Before making changes, let's take a look on the data structures. 
 ```{r dataStructure}
 #Tsla
 #str(tslaSelected)
@@ -472,36 +504,26 @@ sapply(googSelected,function(x){length(unique(x))})
 All `r ncol(tslaSelected)` selected variables in Tesla stock data are quantitative.  
 All `r ncol(googSelected)` selected variables in Google stock data are quantitative.
 
-``` {r interpolation}
-## TSLA
-## Run linear interpolations
-tmp <- zoo::na.approx(tsla[, base::c(14:22, 24:26)])
+Before making changes, let's take a look on the data structures. 
+```{r dataStructure}
+#Tsla
+#str(tslaSelected)
+sapply(tsla,function(x){length(unique(x))})
+summary(tsla)
+#Goog
+#str(googSelected)
+sapply(goog,function(x){length(unique(x))})
 
-## Create empty matrix as placeholder for non-interpolated rows
-row_diff <- base::nrow(tsla) - base::nrow(tmp)
-empty <- base::matrix(base::rep(NA, row_diff * base::ncol(tmp)), nrow = row_diff, ncol = base::ncol(tmp))
-base::colnames(empty) <- base::colnames(tmp)  
-tmp <- base::rbind(tmp, empty)
-
-## Replace original data with interpolation
-tsla[, base::c(14:22, 24:26)] <- tmp
-
-## GOOG
-## Run linear interpolations
-tmp <- zoo::na.approx(goog[, 11:23])
-
-## Create empty matrix as placeholder for non-interpolated rows
-row_diff <- base::nrow(goog) - base::nrow(tmp)
-empty <- base::matrix(base::rep(NA, row_diff * base::ncol(tmp)), nrow = row_diff, ncol = base::ncol(tmp))
-base::colnames(empty) <- base::colnames(tmp)  
-tmp <- base::rbind(tmp, empty)
-
-## Replace original data with interpolation
-goog[, 11:23] <- tmp
+summary(tslaSelected)
 ```
+
+All `r ncol(tslaSelected)` selected variables in Tesla stock data are quantitative.  
+All `r ncol(googSelected)` selected variables in Google stock data are quantitative.
+
 
 ```{r highCorr}
 #Recall highly correlated variables before making changes
+
 highCorrTsla = tslaSelected %>%
   cor %>%
   caret::findCorrelation(.8, names = TRUE)
@@ -582,7 +604,7 @@ If today’s close is equal to yesterday’s close then:
 OBV = Yesterday’s OBV
 
 ```{r OnBalanceVolume}
-tslaLaggedAddOBV = tslaTemp %>% 
+tslaAddOBV = tslaTemp %>% 
   mutate(obv = TTR::OBV(PX_LAST, PX_VOLUME))
 ```
 
@@ -609,11 +631,11 @@ C = close
 Vol = volume
 
 ```{r chaikinMoneyFlow}
-
+#TSLA
 daysCMF = 21
-tslalaggedAddCMF = tslaLaggedAddOBV %>%
-  mutate(cmf = TTR::CMF(tslaLaggedAddOBV[,c("PX_HIGH","PX_LOW","PX_LAST")], PX_VOLUME, n = daysCMF))
-
+tslaAddCMF = tslaAddOBV %>%
+  mutate(cmf = TTR::CMF(tslaAddOBV[,c("PX_HIGH","PX_LOW","PX_LAST")], PX_VOLUME, n = daysCMF))
+#GOOG
 ```
 
 #####Exponential Moving Average (EMA)
@@ -627,10 +649,14 @@ It is unclear whether or not more emphasis should be placed on the most recent d
 
 Similarly, the EMA relies wholly on historical data. Many economists believe that markets are efficient, which means that current market prices already reflect all available information. If markets are indeed efficient, using historical data should tell us nothing about the future direction of asset prices.
 
+EMA calculates an exponentially-weighted mean, giving more weight to recent observations. See
+Warning section below.
 ```{r exponentialMovingAverage}
+#TSLA
 daysEMA = 10 #EMA lengths
-tslalaggedAddEMA = tslalaggedAddCMF %>%
-  mutate(ema = TTR::EMA(tslalaggedAddCMF$PX_LAST,daysEMA))
+tslaAddEMA = tslaAddCMF %>%
+  mutate(emaPrice = TTR::EMA(tslaAddCMF$PX_LAST,daysEMA)) %>%
+  mutate(emaVolume = TTR::EMA(tslaAddCMF$PX_VOLUME,daysEMA))
 
 ###GOOG
 ```
@@ -638,14 +664,41 @@ tslalaggedAddEMA = tslalaggedAddCMF %>%
 ```{r relativeStrengthIndex(RSI)}
 ###Tsla
 daysRSI = 14
-tslalaggedAddRSI = tslalaggedAddEMA %>%
-  mutate(rsi = TTR::RSI(lag(PX_LAST), n=daysRSI, maType="WMA", wts=lag(PX_VOLUME)))
+tslaAddRSI = tslaAddEMA %>%
+  mutate(rsi = TTR::RSI(PX_LAST, n=daysRSI, maType="WMA", wts=PX_VOLUME))
 ###GOOG
 ```
 
-Add lagged values of features. We'll fit time series models later. This can be a fairly good alternative for TS models, which saves us from running the stationarity test for each feature. 
+SMA calculates the arithmetic mean of the series over the past n observations.
+```{r simpleMovingAverage(SMA)}
+###Tsla
 
-```{r addVariables}
+daysSMA = 10
+tslaAddSMA = tslaAddRSI %>%
+  mutate(smaPrice = TTR::SMA(PX_LAST, n=daysSMA)) %>%
+  mutate(smaVolume = TTR::SMA(PX_VOLUME, n=daysSMA))
+###GOOG
+```
+
+```{r momentumStochasticIndex(K% and D%)}
+###Tsla
+#Stochastic Momentum Index
+daysK = 5 #%K is usually set to 5 and represents the main movements of price – slow line.
+daysD = 3 #%D is the fast line, a simple moving average of the %K and is set to 3.
+tslaHLC  = tslaSelected %>% dplyr::select(PX_HIGH, PX_LOW, PX_LAST)
+tslaAddK = tslaAddSMA %>%
+ dplyr::mutate(smi_K = (stoch(tslaHLC, nFastK = daysK, nFastD = daysD, nSlowD = 3, bounded = TRUE,smooth = 1))[,1]) %>% #calculate fastK%
+ dplyr::mutate(smi_D = (stoch(tslaHLC, nFastK = daysK, nFastD = daysD, nSlowD = 3, bounded = TRUE,smooth = 1))[,2])  #calculate fastD%
+
+#bounded:Logical, should current period’s values be used in the calculation? Set it as TRUE here. We will align Y's with past X's in Section xxx.
+#Reference:https://library.tradingtechnologies.com/trade/chrt-ti-stochastic-momentum-index.html
+###GOOG
+```
+
+###Delete it:
+#```{r addVariables}
+#Add lagged values of features. We'll fit time series models later. This can be a fairly good alternative for TS models, which saves us from running the stationarity test for each feature. 
+
 addLaggedVarF = function(feature, dataForModification, featureName,lagSize ) {
   for (lags in 1:lagSize) { 
     newColName = paste0(featureName, lags)
@@ -685,36 +738,38 @@ addDiffVarF = function(dataForModification,nColumn) {
 
 tslaLaggedDiff =  addDiffVarF(tslaLagged,ncol(tslaSelected))
 
-```
+#```
+
+
 
 Up till now, we added lagged features, OBV, CMF,EMA and RSI to our data. Need to clean it up before calculate the correlation of updated data by deleting rows with NAs. (Missing values are simultaneously created as we added past values of features to the data. Thus, we use listwise deletion instead of imputation.)
 
+
 ```{r cleanUpForPCA}
-tslaReg = tslaLaggedDiff %>%
-  select(-names(tslaLaggedDiff)[1:20]) %>% 
-  #Our goal is to predict tomorrow's stock trend by using data collected by today or/and in the past. So the supervisor(stockReturnDummy) should lead all features at least one day.
-  #For instance, instead of using "PX_HIGH" to predict "stockReturnDummy", we should use "PX_HIGH1".
+tslaFull = tslaAddK %>%
   na.omit()
+
+tslaY    = dplyr::as_tibble(tslaFull$stockReturn[2:nrow(tslaFull)])
+tslaX    = tslaFull %>% 
+  dplyr::select(-stockReturn) %>%
+  .[1:(nrow(tslaFull)-1),] %>%
+  dplyr::as_tibble(.) 
+
+#We have to make an assumption here as our data are time-sensitive:
+#All the features in original data are collected after the stock market closure, which means we can only use data happened(or collected) in today and/or before today to predict tomorrow. Thus, we align Y with lag(x, nlags=1).
 ```
 
 ```{r newPCA}
 
 #Transform the selected data
+summary(tslaX)
 
-tslaRegX = tslaReg %>% select(-stockReturn)
-(tslaRegTrans = caret::preProcess(tslaRegX, method = c("BoxCox","center","scale","pca")))
+(tslaXTrans = caret::preProcess(tslaX, method = c("BoxCox","center","scale","pca")))
+
 
 #Apply the transformations("BoxCox","center","scale","pca")
-tslaRegPCA = stats::predict(tslaRegTrans,tslaRegX) #Outputs are PCA components
-utils::head(tslaRegPCA)
-
-#Summary of PCA results
-tslaRegTrans_     = caret::preProcess(tslaRegX, method = c("BoxCox","center","scale"))
-propVarTslaRegPCA = tslaRegX %>%
-                 stats::predict(tslaRegTrans_,.) %>%
-                 stats::prcomp() %>%
-                 summary()
-propVarTslaRegPCA #proportion of variance explained by each PCs
+pcaTslaX = stats::predict(tslaXTrans,tslaX) #Outputs are PCA components
+head(pcaTslaX)
 
 #Check extreme observations via PCA
 
@@ -861,6 +916,9 @@ The selected logistic model has very low R-squared but all coefficients
 #confusion matrix
 
 ```
+
+
+
 
 
 ##### 5.x Potential Problems
