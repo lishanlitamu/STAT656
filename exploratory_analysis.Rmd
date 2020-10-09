@@ -858,17 +858,52 @@ plot3D::scatter3D(pcaTslaX$PC1, pcaTslaX$PC2, pcaTslaX$PC3, pch = 16,
 
 #diffHighLow vs PCs
 ggplot(data = pcaTslaX)+
-  geom_point(aes(x = PC1, y=tslaY$diffHighLowTomorrow))
+  geom_point(aes(x = PC1, y=tslaY$diffHighLowTomorrow), color=ifelse(tslaY$diffHighLowTomorrow > mean(tslaY$diffHighLowTomorrow),"red", "blue"))
 
 ggplot(data = pcaTslaX)+
-  geom_point(aes(x = PC2, y=tslaY$diffHighLowTomorrow))
+  geom_point(aes(x = PC1, y=tslaY$diffHighLowTomorrow)
+, color=ifelse(tslaX$diffHighLow > mean(tslaX$diffHighLow),"red", "blue"))
 
 ggplot(data = pcaTslaX)+
-  geom_point(aes(x = PC3, y=tslaY$diffHighLowTomorrow))
+  geom_point(aes(x = PC1, y=tslaY$diffHighLowTomorrow)
+, color=ifelse(tslaX$stockReturn > mean(tslaX$stockReturn),"red", "blue"))
+
+ggplot(data = pcaTslaX)+
+  geom_point(aes(x = PC2, y=tslaY$diffHighLowTomorrow), color=ifelse(tslaY$diffHighLowTomorrow > mean(tslaY$diffHighLowTomorrow),"red", "blue"))
+
+ggplot(data = pcaTslaX)+
+  geom_point(aes(x = PC2, y=tslaY$diffHighLowTomorrow)
+, color=ifelse(tslaX$diffHighLow > mean(tslaX$diffHighLow),"red", "blue"))
+
+ggplot(data = pcaTslaX)+
+  geom_point(aes(x = PC2, y=tslaY$diffHighLowTomorrow)
+, color=ifelse(tslaX$stockReturn > mean(tslaX$stockReturn),"red", "blue"))
+
+ggplot(data = pcaTslaX)+
+  geom_point(aes(x = PC3, y=tslaY$diffHighLowTomorrow)
+             , color=ifelse(tslaY$diffHighLowTomorrow > mean(tslaY$diffHighLowTomorrow),"red", "blue"))
+
+ggplot(data = pcaTslaX)+
+  geom_point(aes(x = PC3, y=tslaY$diffHighLowTomorrow)
+, color=ifelse(tslaX$diffHighLow > mean(tslaX$diffHighLow),"red", "blue"))
+
+ggplot(data = pcaTslaX)+
+  geom_point(aes(x = PC3, y=tslaY$diffHighLowTomorrow)
+, color=ifelse(tslaX$stockReturn > mean(tslaX$stockReturn),"red", "blue"))
+
+scatterplot3d::scatterplot3d(x = pcaTslaX$PC1, y = pcaTslaX$PC2,
+                             z = tslaY$diffHighLowTomorrow, pch = 16, color = ifelse(tslaY$diffHighLowTomorrow > mean(tslaY$diffHighLowTomorrow),"red", "blue"))
 
 #stockReturn vs PCs
+
 ggplot(data = pcaTslaX)+
-  geom_point(aes(x = PC1, y=tslaY$stockReturnTomorrow))
+  geom_point(aes(x = PC1, y=tslaY$stockReturnTomorrow), color=ifelse(tslaX$stockReturn > mean(tslaX$stockReturn),"red", "blue"))
+
+ggplot(data = pcaTslaX)+
+  geom_point(aes(x = PC1, y=tslaY$stockReturnTomorrow), color=ifelse(tslaX$diffHighLow > mean(tslaX$diffHighLow),"red", "blue")) 
+
+ggplot(data = pcaTslaX)+
+  geom_point(aes(x = PC1, y=tslaY$stockReturnTomorrow), color=ifelse(tslaX$stockReturn > mean(tslaX$stockReturn),"red", "blue"))
 
 ggplot(data = pcaTslaX)+
   geom_point(aes(x = PC2, y=tslaY$stockReturnTomorrow))
