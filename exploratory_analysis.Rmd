@@ -884,28 +884,34 @@ XtslaAddLevels = tslaFull %>%
   select(aboveR1, aboveR2, aboveR3, belowS1, belowS2, belowS3)            
 XtslaDummyModel = caret::dummyVars(~ ., data = XtslaAddLevels, fullRank = TRUE)
 
-YtslaAddLevels %>% 
-  mutate(diffHighLow)
-  factor(ifelse(tslaY$stockReturn > 0, "Increased", "Decreased"))
+YtslaAddLevels = as_tibble(factor(ifelse(tslaY$stockReturnTomorrow > 0, "Increased", "Decreased"))) 
 
 YtslaDummyModel = caret::dummyVars(~ ., data = YtslaAddLevels, fullRank = TRUE)
 
 XtslaDummy = as_tibble(predict(XtslaDummyModel, XtslaAddLevels))
 YtslaDummy = as_tibble(predict(YtslaDummyModel, YtslaAddLevels))
-YtslaDummy = factor(ifelse(tslaY$stockReturn > 0, "Increased", "Decreased"))
 
-XtslaLogReg = tslaX %>%
+names(YtslaDummy)[1] = "stockReturnTomorrowDummy" #Y2
+
+tslaLogReg = tslaFull %>%
   mutate(XtslaDummy) %>% 
-  dplyr::select(-R1,-S1,-R2,-S2,-R3,-S3)#Drop PP, R1, R2, R3, S1, S2, S3 
+  dplyr::select(-R1,-S1,-R2,-S2,-R3,-S3) %>% 
+  #Drop PP, R1, R2, R3, S1, S2, S3 
+  mutate(YtslaDummy) 
+
 ```
 
-```{r removeHighCorr}
-hclustPlotF(cbind(tslaY,XtslaLogReg))
-highCorrTsla = highCorrF(XtslaLogReg,0.8)
-hclustPlotF(XtslaLogReg)
-tslaLogRegRemoveCorr = select(XtslaLogReg, -highCorrTsla)
+#```{r removeHighCorr}
+hclustPlotF(tslaLogReg)
+XtslaLogReg = tslaLogReg %>%
+  select(-diffHighLowTomorrow, -stockReturnTomorrow,-stockReturnTomorrowDummy)
+
+highCorrTsla = highCorrF(tslaFull,0.8)
+highCorrTsla
+
+tslaLogRegRemoveCorr = XtslaLogReg %>% select(-highCorrTsla)
 hclustPlotF(tslaLogRegRemoveCorr)
-```
+#```
 
 Many features in our data are not normally distributed, which violates the normality assumption for LDA. Thus, we'll fit our data with a logistic regression model. 
 
@@ -932,10 +938,19 @@ summary(tslaOutLogistic2)
 
 ##alternative:use glm() and library(mass)
 library(MASS)
-tslaOutLogistic = glm(YtslaDummy ~ a+b+c, family = binomial, data = xx)
+XtslaLogReg = tslaLogReg %>%
+  select(-diffHighLowTomorrow, -stockReturnTomorrow,-stockReturnTomorrowDummy)
 
+tslaOutLogistic = glm(stockReturnTomorrowDummy ~ ., family = binomial, data = tslaLogReg)
+
+summary(tslaOutLogistic)
 library(bestglm)
-glmTslaBest = bestglm::bestglm(dataframeWithYatLast, family = binomial, IC="BIC")
+tslaBestGLM = 
+tslaBestGlmFit = bestglm::bestglm(dataframeWithYatLast, family = binomial, IC="BIC")
+
+tlsaLinearRegFull = tslaFull %>%
+  select(-stockReturnTomorrow)
+
 
 ```
 
