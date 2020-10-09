@@ -67,7 +67,7 @@ gridExtra::grid.arrange(tsla_plot, goog_plot)
 ### 2 - Data Preprocessing (Missingness and Collinearity)
 #### 2.1 Data Interpolation
 
-As we have both daily and quarterly updated features aligned in the original data set, quarterly updated features contains mainly missing values. Instead of those features, missing values are interpolated between quarters.   
+As we have both daily and quarterly updated features aligned in the original data set, quarterly updated features contains mainly missing values. Instead of deleting those features, missing values are interpolated between quarters.   
 
 ``` {r interpolation}
 ## TSLA
