@@ -786,38 +786,28 @@ Up till now, we added xx stock indicators:
 
 
 ```{r assignYandX}
-tslaAddCCIRemoveNA = tslaAddCCI %>%
-  na.omit()
+tslaY  = tslaAddCCI %>%
+  na.omit() %>%
+  dplyr::select(diffHighLow, stockReturn) %>%
+  dplyr::as_tibble() %>%
+  dplyr::slice(-1)
 
-tslaY_    = dplyr::as_tibble(tslaAddCCIRemoveNA$stockReturn[2:nrow(tslaAddCCIRemoveNA)]) 
-tslaY   = dplyr::as_tibble(tslaAddCCIRemoveNA$diffHighLow[2:nrow(tslaAddCCIRemoveNA)]) 
 
-
-tslaX_    = tslaAddCCIRemoveNA %>% 
-  #dplyr::select(-stockReturn) %>% Don't delete it. Use as a AutoRegression feature.
+tslaX    = tslaAddCCI %>%
+  na.omit() %>%
   .[1:(nrow(tslaAddCCIRemoveNA)-1),] %>%
   dplyr::as_tibble(.) 
 
-tslaX   = tslaAddCCIRemoveNA %>% 
-  #dplyr::select(-diffHighLow) %>% Don't delete it. Use as a AutoRegression feature.
-  .[1:(nrow(tslaAddCCIRemoveNA)-1),] %>%
-  dplyr::as_tibble(.) 
+names(tslaY)[1] = "diffHighLowTomorrow" #Y1
+names(tslaY)[2] = "stockReturnTomorrow" #Y2
 
-tslaFull_ = as_tibble(cbind(tslaY_,tslaX_))
 tslaFull = as_tibble(cbind(tslaY,tslaX))
 
-names(tslaFull_)[1] = "stockReturnTomorrow"
-names(tslaFull)[1] = "diffHighLowTomorrow"
-
-
-hclustPlotF(tslaFull_)
 hclustPlotF(tslaFull)
 
-names(tslaX_)[(cor(tslaY_,tslaX_)>=0.5)]
-names(tslaX_)[which.max(cor(tslaY_,tslaX_))]
-
-names(tslaX)[(cor(tslaY,tslaX)>=0.5)]
 #Correlation between stock data of today and difference between highest and lowest stock prices on tomorrow is much higher than correlation between stock data of today and daily stock return on tomorrow. Thus, it's suggested to use "diffHighLowTomorrow " as the supervisor in model fitting.
+
+summary(tslaY$diffHighLowTomorrow)
 
 ```
 
@@ -859,13 +849,24 @@ plot3D::scatter3D(pcaTslaX$PC1, pcaTslaX$PC2, pcaTslaX$PC3, pch = 16,
 
 #diffHighLow vs PCs
 ggplot(data = pcaTslaX)+
-  geom_point(aes(x = PC1, y=tslaY$value))
+  geom_point(aes(x = PC1, y=tslaY$diffHighLowTomorrow))
 
 ggplot(data = pcaTslaX)+
-  geom_point(aes(x = PC2, y=tslaY$value))
+  geom_point(aes(x = PC2, y=tslaY$diffHighLowTomorrow))
 
 ggplot(data = pcaTslaX)+
-  geom_point(aes(x = PC3, y=tslaY$value))
+  geom_point(aes(x = PC3, y=tslaY$diffHighLowTomorrow))
+
+#stockReturn vs PCs
+ggplot(data = pcaTslaX)+
+  geom_point(aes(x = PC1, y=tslaY$stockReturnTomorrow))
+
+ggplot(data = pcaTslaX)+
+  geom_point(aes(x = PC2, y=tslaY$stockReturnTomorrow))
+
+ggplot(data = pcaTslaX)+
+  geom_point(aes(x = PC3, y=tslaY$stockReturnTomorrow))
+
 
 ```
 
@@ -873,18 +874,20 @@ ggplot(data = pcaTslaX)+
 ```{r dummyVarForLogisticRegression}
 #hist(tslaReg$stockReturn, breaks=20, freq=FALSE,main = paste("Density Plot - ",names(tslaReg$stockReturn)),xlab = " ") # stock return is normally distributed.
 
-tslaAddLevels = tslaFull %>%
+XtslaAddLevels = tslaFull %>%
   mutate(aboveR1 = factor(ifelse(PX_HIGH > R1, "Yes", "No"))) %>%
   mutate(aboveR2 = factor(ifelse(PX_HIGH > R2, "Yes", "No"))) %>%
   mutate(aboveR3 = factor(ifelse(PX_HIGH > R3, "Yes", "No"))) %>%
   mutate(belowS1 = factor(ifelse(PX_LOW  < S1, "Yes", "No"))) %>%
   mutate(belowS2 = factor(ifelse(PX_LOW  < S2, "Yes", "No"))) %>%
   mutate(belowS3 = factor(ifelse(PX_LOW  < S3, "Yes", "No"))) %>%
-  select(aboveR1, aboveR2, aboveR3, belowS1, belowS2, belowS3)                   
-
-
-YtslaAddLevels =  factor(ifelse(tslaY$stockReturn > 0, "Increased", "Decreased"))
+  select(aboveR1, aboveR2, aboveR3, belowS1, belowS2, belowS3)            
 XtslaDummyModel = caret::dummyVars(~ ., data = XtslaAddLevels, fullRank = TRUE)
+
+YtslaAddLevels %>% 
+  mutate(diffHighLow)
+  factor(ifelse(tslaY$stockReturn > 0, "Increased", "Decreased"))
+
 YtslaDummyModel = caret::dummyVars(~ ., data = YtslaAddLevels, fullRank = TRUE)
 
 XtslaDummy = as_tibble(predict(XtslaDummyModel, XtslaAddLevels))
@@ -955,16 +958,7 @@ The selected logistic model has very low R-squared but all coefficients
 
 ```
 
-
-
-
-
-##### 5.x Potential Problems
-###### 5.x.1 correlation of error term(residuals)
-###### 5.x.2 outliers
-
-
-##### 6 - Time Series Analysis
+##### 6 - Neural Networks
 ```{r timeSeriesAnalysis}
 #Check stationarity
 cuberoot=function(x){
@@ -981,4 +975,7 @@ tslaACF = tslaReg %>%
   apply(., 2, acf)
 ```
 
-##### 7 - Clustering
+##### 7 - SVM
+
+
+##### 8 - Random Forest
