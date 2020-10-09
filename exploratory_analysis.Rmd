@@ -31,6 +31,8 @@ library(RcppRoll) #CMF
 library(TTR)      #Calculate Indicators: EMA,SMA,RSI
 library(leaps)    #Stepwise Model Selection
 library(zoo) # Interpolation
+library(elasticnet) #ridge, lasso, elastic net regression
+
 knitr::opts_chunk$set(echo = T)
 ```
 
@@ -63,9 +65,9 @@ gridExtra::grid.arrange(tsla_plot, goog_plot)
 ```
 
 ### 2 - Data Preprocessing (Missingness and Collinearity)
-#### 2.1 Count the number of Missing Values in each feature
+#### 2.1 Data Interpolation
 
-As we have both daily and quarterly updated features aligned in the original data set, quarterly updated features contains mainly missing values. Instead of deleting quarterly updated features, missing values are interpolated between quarters.   
+As we have both daily and quarterly updated features aligned in the original data set, quarterly updated features contains mainly missing values. Instead of those features, missing values are interpolated between quarters.   
 
 ``` {r interpolation}
 ## TSLA
@@ -94,6 +96,8 @@ tmp <- base::rbind(tmp, empty)
 ## Replace original data with interpolation
 goog[, 11:23] <- tmp
 ```
+
+#### 2.2 Count the number of Missing Values in each feature
 
 ```{r numNA, warning=FALSE}
 require(dplyr)
@@ -148,9 +152,9 @@ knitr::kable(
 ```
 
 
-#### 2.2 Data Transformation
+#### 2.3 Data Transformation
 
-##### 2.2.1 Data Filtering - Tesla
+##### 2.3.1 Data Filtering - Tesla
 Features with less than 100 missing values will be included by deleting corresponding rows with missing values instead.
 ```{r filterTsla, warning=FALSE}
 #Select a subset of original data for data transformation and PCA
@@ -164,7 +168,7 @@ tslaSelected$TURNOVER = log(tslaSelected$TURNOVER)
 base::names(tslaSelected) [6]= "log(TURNOVER)"
 ```
 
-##### 2.2.2 Calculate Skewness and Kurtosis - Tesla
+##### 2.3.2 Calculate Skewness and Kurtosis - Tesla
 ```{r skewnessTsla, warning=FALSE}
 require(e1071)
 skewnessTsla = apply(tslaSelected,2,e1071::skewness)
@@ -195,7 +199,7 @@ knitr::kable(
 )
 ```
 
-##### 2.2.3 Data Transformation - Tesla
+##### 2.3.3 Data Transformation - Tesla
 ```{r dataTransTsla, warning=FALSE}
 #Transform the selected data
 (tslaTrans = caret::preProcess(tslaSelected, method = c("BoxCox","center","scale","pca")))
@@ -243,7 +247,7 @@ for (i in 1:ncol(tslaSelected)) {
 }
 ```
 
-##### 2.2.4 Data Filtering - Google
+##### 2.3.4 Data Filtering - Google
 Features with less than 100 missing values will be included by deleting corresponding rows with missing values instead.
 ```{r filterGoog, warning=FALSE}
 #Select a subset of original data for data transformation and PCA
@@ -257,7 +261,7 @@ googSelected$TURNOVER = base::log(googSelected$TURNOVER)
 base::names(googSelected) [6]= "log(TURNOVER)"
 ```
 
-##### 2.2.5 Calculate Skewness and Kurtosis - Google
+##### 2.3.5 Calculate Skewness and Kurtosis - Google
 ```{r skewnessGoog, warning=FALSE}
 #require(e1071)
 skewnessGoog = apply(googSelected,2,e1071::skewness)
@@ -290,7 +294,7 @@ knitr::kable(
 
 ```
 
-##### 2.2.6 Data Transformation - Google
+##### 2.3.6 Data Transformation - Google
 ```{r dataTransGoog, warning=FALSE}
 #Transform the selected data
 (googTrans = caret::preProcess(googSelected, method = c("BoxCox","center","scale","pca")))
@@ -337,7 +341,7 @@ for (i in 1:ncol(googSelected)) {
 }
 ```
 
-#### 2.3 Correlation Analysis
+#### 2.4 Correlation Analysis
 >__Tesla__
 
 ```{r findCorrelationTsla, warning=FALSE}
@@ -736,6 +740,10 @@ names(beforeAfterVar)
 
 ```
 
+Up till now, we added xx stock indicators:
+`r names(beforeAfterVar)`
+
+#### Probably delete below codes later ##################
 #```{r addLaggedVariables}
 #Add lagged values of features. We'll fit time series models later. This can be a fairly good alternative for TS models, which saves us from running the stationarity test for each feature. 
 
@@ -779,6 +787,7 @@ addDiffVarF = function(dataForModification,nColumn) {
 
 tslaAddDiff =  addDiffVarF(tslaSelected,ncol(tslaSelected))
 #``` #A few added indicators represent moving average of price or volume in a past designated period. Hence, we probably don't need to include lagged values. 
+#### Probably delete above codes later #######################
 
 Up till now, we added xx stock indicators:
 `r names(beforeAfterVar)`
@@ -913,9 +922,92 @@ tslaLogRegRemoveCorr = XtslaLogReg %>% select(-highCorrTsla)
 hclustPlotF(tslaLogRegRemoveCorr)
 #```
 
+```{r linearRegression}
+#First, correct skewness
+tslaXyeoJ = tslaX %>%
+  caret::preProcess(method = "YeoJohnson") %>%
+  predict(newdata = tslaX)
+
+#hist(tslaY$diffHighLowTomorrow)
+#hist(tslaY$stockReturnTomorrow)
+tslaYyeoJ = tslaY %>%
+  caret::preProcess(method = "YeoJohnson") %>%
+  predict(newdata = tslaY)
+#hist(tslaYyeoJ$diffHighLowTomorrow)
+#hist(tslaYyeoJ$stockReturnTomorrow)
+
+Ktsla = 25
+cvIndexTsla = caret::createFolds(tslaYyeoJ$diffHighLowTomorrow, k = Ktsla, returnTrain = TRUE)
+trControl = trainControl(method = "cv", index = cvIndexTsla)
+
+XtslaPenalty = tslaXyeoJ %>%
+  caret::preProcess(method = c("center","scale")) %>%
+  predict(tslaXyeoJ) %>%
+  cbind(.,XtslaDummy) %>%
+  dplyr::select(-R1,-S1,-R2,-S2,-R3,-S3)
+
+YtslaPenalty = tslaYyeoJ %>%
+  caret::preProcess(method = c("center","scale")) %>%
+  predict(newdata = tslaYyeoJ)
+
+lmOutTsla = train(x = XtslaPenalty, y = YtslaPenalty$diffHighLowTomorrow, method = "lm", trControl = trControl)
+
+lmOutTsla
+```
+
+```{r penalizedRegression}
+#Errors in ridge and lasso regression are solved by removing highly correlated features in XtslaPenalty
+highCorrTsla = XtslaPenalty %>% highCorrF(.,0.8) %>%
+              .[-c(25,27)] %>%
+  c(.,c("macdPrice","macdVolume")) 
+XtslaLogRegRemoveCorr = XtslaPenalty %>% select(-highCorrTsla)
+
+#ridge regression
+ridgeOutTsla = train(x = XtslaLogRegRemoveCorr, y = YtslaPenalty$diffHighLowTomorrow, method = "ridge", tuneLength = 10,trControl = trControl)
+
+ridgeOutTsla
+
+#lasso regression
+lassoOutTsla = train(x = XtslaLogRegRemoveCorr, y = YtslaPenalty$diffHighLowTomorrow, method = "lasso", tuneLength = 10,trControl = trControl)
+
+lassoOutTsla
+
+#elastic net
+gridLambdaAlpha = expand.grid(lambda = seq(1e-6, 0.05, length = 15), alpha = c(0,0.25,.5,.75,1))
+
+enetOutTsla = train(x = XtslaPenalty, y = YtslaPenalty$diffHighLowTomorrow,
+                method = "glmnet", tuneGrid = gridLambdaAlpha, trControl = trControl)
+
+enetOutTsla
+
+plot(enetOutTsla, xlab = "Lambda (Elastic Net Penalty)", ylab = "RMSE (K-fold CV)" )
+
+#Results of penalized linear model
+names(enetOutTsla$finalModel)
+
+alphaHatTsla  = enetOutTsla$finalModel$tuneValue$alpha
+lambdaHatTsla = enetOutTsla$finalModel$tuneValue$lambda
+
+```
+
+>Tesla (TSLA)
+
+The CV - minimizing values are alpha = `r alphaHatTsla` and lambda = `r lambdaHatTsla`.
+Next, refit the model with this alpha by calling "glmnet" directly and select the lambdaHat that minimized CV. 
+
+Use results from  Elastic Net Regression to find coefficients Beta's.
+
+```{r betaPenalizedRegression}
+glmnetOutTsla = glmnet::glmnet(x = as.matrix(XtslaPenalty), y = YtslaPenalty$diffHighLowTomorrow, alpha = alphaHatTsla, standardize = FALSE)
+betaHatTsla = coef(glmnetOutTsla, s = lambdaHatTsla)
+betaHatTsla
+##Question: Collinearity in Elastic Net regression
+```
+
 Many features in our data are not normally distributed, which violates the normality assumption for LDA. Thus, we'll fit our data with a logistic regression model. 
 
-```{r logisticRegression}
+#```{r logisticRegression}
+
 trControl = trainControl(method = 'none')
 tslaOutLogistic = train(x = XtslaLogReg, y = YtslaDummy, method = 'glm', trControl = trControl)
 
@@ -952,7 +1044,7 @@ tlsaLinearRegFull = tslaFull %>%
   select(-stockReturnTomorrow)
 
 
-```
+#```
 
 The selected logistic model has very low R-squared but all coefficients 
 
@@ -974,21 +1066,7 @@ The selected logistic model has very low R-squared but all coefficients
 ```
 
 ##### 6 - Neural Networks
-```{r timeSeriesAnalysis}
-#Check stationarity
-cuberoot=function(x){
-    x=sign(x)*abs(x)^(1/3)
-  }
-require(graphics)
-par(mfrow=c(2,2))
-tslaTsPlot = tslaReg %>% 
-  apply(., 2, function(x) {diff(diff(cuberoot(x)))}) %>%
-  apply(., 2, ts.plot)
 
-tslaACF = tslaReg %>% 
-  apply(., 2, function(x) {diff(diff(cuberoot(x)))}) %>%
-  apply(., 2, acf)
-```
 
 ##### 7 - SVM
 
