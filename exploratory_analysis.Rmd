@@ -31,6 +31,8 @@ library(RcppRoll) #CMF
 library(TTR)      #Calculate Indicators: EMA,SMA,RSI
 library(leaps)    #Stepwise Model Selection
 library(zoo) # Interpolation
+library(elasticnet) #ridge, lasso, elastic net regression
+
 knitr::opts_chunk$set(echo = T)
 ```
 
@@ -63,9 +65,9 @@ gridExtra::grid.arrange(tsla_plot, goog_plot)
 ```
 
 ### 2 - Data Preprocessing (Missingness and Collinearity)
-#### 2.1 Count the number of Missing Values in each feature
+#### 2.1 Data Interpolation
 
-As we have both daily and quarterly updated features aligned in the original data set, quarterly updated features contains mainly missing values. Instead of deleting quarterly updated features, missing values are interpolated between quarters.   
+As we have both daily and quarterly updated features aligned in the original data set, quarterly updated features contains mainly missing values. Instead of deleting those features, missing values are interpolated between quarters.   
 
 ``` {r interpolation}
 ## TSLA
@@ -94,6 +96,8 @@ tmp <- base::rbind(tmp, empty)
 ## Replace original data with interpolation
 goog[, 11:23] <- tmp
 ```
+
+#### 2.2 Count the number of Missing Values in each feature
 
 ```{r numNA, warning=FALSE}
 require(dplyr)
@@ -148,9 +152,9 @@ knitr::kable(
 ```
 
 
-#### 2.2 Data Transformation
+#### 2.3 Data Transformation
 
-##### 2.2.1 Data Filtering - Tesla
+##### 2.3.1 Data Filtering - Tesla
 Features with less than 100 missing values will be included by deleting corresponding rows with missing values instead.
 ```{r filterTsla, warning=FALSE}
 #Select a subset of original data for data transformation and PCA
@@ -164,7 +168,7 @@ tslaSelected$TURNOVER = log(tslaSelected$TURNOVER)
 base::names(tslaSelected) [6]= "log(TURNOVER)"
 ```
 
-##### 2.2.2 Calculate Skewness and Kurtosis - Tesla
+##### 2.3.2 Calculate Skewness and Kurtosis - Tesla
 ```{r skewnessTsla, warning=FALSE}
 require(e1071)
 skewnessTsla = apply(tslaSelected,2,e1071::skewness)
@@ -195,7 +199,7 @@ knitr::kable(
 )
 ```
 
-##### 2.2.3 Data Transformation - Tesla
+##### 2.3.3 Data Transformation - Tesla
 ```{r dataTransTsla, warning=FALSE}
 #Transform the selected data
 (tslaTrans = caret::preProcess(tslaSelected, method = c("BoxCox","center","scale","pca")))
@@ -243,7 +247,7 @@ for (i in 1:ncol(tslaSelected)) {
 }
 ```
 
-##### 2.2.4 Data Filtering - Google
+##### 2.3.4 Data Filtering - Google
 Features with less than 100 missing values will be included by deleting corresponding rows with missing values instead.
 ```{r filterGoog, warning=FALSE}
 #Select a subset of original data for data transformation and PCA
@@ -257,7 +261,7 @@ googSelected$TURNOVER = base::log(googSelected$TURNOVER)
 base::names(googSelected) [6]= "log(TURNOVER)"
 ```
 
-##### 2.2.5 Calculate Skewness and Kurtosis - Google
+##### 2.3.5 Calculate Skewness and Kurtosis - Google
 ```{r skewnessGoog, warning=FALSE}
 #require(e1071)
 skewnessGoog = apply(googSelected,2,e1071::skewness)
@@ -290,7 +294,7 @@ knitr::kable(
 
 ```
 
-##### 2.2.6 Data Transformation - Google
+##### 2.3.6 Data Transformation - Google
 ```{r dataTransGoog, warning=FALSE}
 #Transform the selected data
 (googTrans = caret::preProcess(googSelected, method = c("BoxCox","center","scale","pca")))
@@ -337,7 +341,7 @@ for (i in 1:ncol(googSelected)) {
 }
 ```
 
-#### 2.3 Correlation Analysis
+#### 2.4 Correlation Analysis
 >__Tesla__
 
 ```{r findCorrelationTsla, warning=FALSE}
@@ -504,7 +508,7 @@ sapply(googSelected,function(x){length(unique(x))})
 All `r ncol(tslaSelected)` selected variables in Tesla stock data are quantitative.  
 All `r ncol(googSelected)` selected variables in Google stock data are quantitative.
 
-Before making changes, let's take a look on the data structures. 
+Before making any changes, let's take a look on the data structures. 
 ```{r dataStructure}
 #Tsla
 #str(tslaSelected)
@@ -697,12 +701,50 @@ tslaAddK = tslaAddSMA %>%
 
 ### Moving Average Convergence Divergence
 ```{r MACD}
+daysMACDslow   = 26 #default nSlow
+daysMACDfast   = 12 #default nFast
+daysMACDsignal = 9  #default nSig
 tslaAddMACD = tslaAddK %>%
-  mutate(smaPrice = TTR::SMA(PX_LAST, n=daysSMA))
+  mutate(macdPrice = TTR::MACD(PX_LAST, nFast = daysMACDfast, nSlow = daysMACDslow, nSig = daysMACDsignal)) %>%
+  #mutate(macdPrice = TTR::MACD(nFast = 12, nSlow = 26, nSig = 9, maType="WMA", wts=PX_VOLUME)) %>% # weighted macdPrice
+  mutate(macdVolume = TTR::MACD(PX_VOLUME, nFast = daysMACDfast, nSlow = daysMACDslow, nSig = daysMACDsignal))
 
 ```
-###Delete it:
-#```{r addVariables}
+
+```{r LarryWilliam's R%}
+daysR = 14 #default
+#tslaHLC  = tslaSelected %>% dplyr::select(PX_HIGH, PX_LOW, PX_LAST)
+tslaAddR = tslaAddMACD %>%
+  mutate(larryWilliamsR = TTR::WPR(tslaHLC, n = daysR))
+```
+
+TheWilliams Accumulation / Distribution (AD) line is a measure of market momentum. Developed by Larry Williams. The Williams AD line differs from OBV and chaikinAD in that it doesn’t take volume into account.
+```{r Accumulation/Distribution}
+tslaAddAD = tslaAddR %>%
+  mutate(williamsAD = TTR::williamsAD(tslaHLC))
+
+```
+
+The Commodity Channel Index (CCI) attempts to identify starting and ending trends.CCI relates the current price and the average of price over n periods. The CCI usually falls in a channel of -100 to 100. A basic CCI trading system is: Buy (sell) if CCI rises above 100 (falls below -100) and sell (buy) when it falls below 100 (rises above -100).
+
+```{r CommodityChannelIndex(CCI)}
+daysCCI = 20
+tslaAddCCI = tslaAddAD %>%
+  mutate(cci = TTR::CCI(tslaHLC, n = daysCCI))
+#--End--#
+
+#Summarize how many indicators we've added. 
+
+beforeAfterVar = tslaAddCCI[,(ncol(tslaSelected)+1):ncol(tslaAddCCI)]
+names(beforeAfterVar)
+
+```
+
+Up till now, we added xx stock indicators:
+`r names(beforeAfterVar)`
+
+#### Probably delete below codes later ##################
+#```{r addLaggedVariables}
 #Add lagged values of features. We'll fit time series models later. This can be a fairly good alternative for TS models, which saves us from running the stationarity test for each feature. 
 
 addLaggedVarF = function(feature, dataForModification, featureName,lagSize ) {
@@ -715,11 +757,12 @@ addLaggedVarF = function(feature, dataForModification, featureName,lagSize ) {
 }
 
 #Create lagged features for model fitting (use as an alternative to Time Series Model)
+#List all predictors and decide of which predictors we should calculate lagged values.
+names(tslaAddCCI)
+
 lags10Days = 10
 lags21Days = 21
-tslaLagged = addLaggedVarF(tslalaggedAddRSI$PX_HIGH, tslalaggedAddRSI, "PX_HIGH",lags10Days)
-
-
+tslaLagged = addLaggedVarF(tslaAddCCI$PX_HIGH, tslalaggedAddRSI, "PX_HIGH",lags10Days)
 for (j in 2:ncol(tslalaggedAddRSI)) {
   tslaLagged = addLaggedVarF(tslalaggedAddRSI[,j], tslaLagged, names(tslalaggedAddRSI)[j],lags10Days)
 }
@@ -742,32 +785,43 @@ addDiffVarF = function(dataForModification,nColumn) {
  return(laggedDiff)
 }
 
-tslaLaggedDiff =  addDiffVarF(tslaLagged,ncol(tslaSelected))
+tslaAddDiff =  addDiffVarF(tslaSelected,ncol(tslaSelected))
+#``` #A few added indicators represent moving average of price or volume in a past designated period. Hence, we probably don't need to include lagged values. 
+#### Probably delete above codes later #######################
 
-#```
+Up till now, we added xx stock indicators:
+`r names(beforeAfterVar)`
 
 
 
-Up till now, we added lagged features, OBV, CMF,EMA and RSI to our data. Need to clean it up before calculate the correlation of updated data by deleting rows with NAs. (Missing values are simultaneously created as we added past values of features to the data. Thus, we use listwise deletion instead of imputation.)
+```{r assignYandX}
+tslaY  = tslaAddCCI %>%
+  na.omit() %>%
+  dplyr::select(diffHighLow, stockReturn) %>%
+  dplyr::as_tibble() %>%
+  dplyr::slice(-1)
 
 
-```{r cleanUpForPCA}
-tslaFull = tslaAddK %>%
-  na.omit()
-
-tslaY    = dplyr::as_tibble(tslaFull$stockReturn[2:nrow(tslaFull)]) 
-names(tslaY)[1] = "stockReturn"
-
-tslaX    = tslaFull %>% 
-  dplyr::select(-stockReturn) %>%
-  .[1:(nrow(tslaFull)-1),] %>%
+tslaX    = tslaAddCCI %>%
+  na.omit() %>%
+  .[1:(nrow(tslaAddCCIRemoveNA)-1),] %>%
   dplyr::as_tibble(.) 
 
-#We have to make an assumption here as our data are time-sensitive:
-#All the features in original data are collected after the stock market closure, which means we can only use data happened(or collected) in today and/or before today to predict tomorrow. Thus, we align Y with lag(x, nlags=1).
+names(tslaY)[1] = "diffHighLowTomorrow" #Y1
+names(tslaY)[2] = "stockReturnTomorrow" #Y2
+
+tslaFull = as_tibble(cbind(tslaY,tslaX))
+
+hclustPlotF(tslaFull)
+
+#Correlation between stock data of today and difference between highest and lowest stock prices on tomorrow is much higher than correlation between stock data of today and daily stock return on tomorrow. Thus, it's suggested to use "diffHighLowTomorrow " as the supervisor in model fitting.
+
+summary(tslaY$diffHighLowTomorrow)
+
 ```
 
 ```{r PCA Regression}
+#It's suggested to use only quantitative variables in PCA regression
 
 #Transform the selected data
 
@@ -776,7 +830,7 @@ tslaX    = tslaFull %>%
 
 #Apply the transformations("BoxCox","center","scale","pca")
 pcaTslaX = stats::predict(tslaXTrans,as.data.frame(tslaX)) #Outputs are PCA components
-head(pcaTslaX)
+#head(pcaTslaX)
 
 #Summary of PCA results
 tslaXTrans_     = caret::preProcess(as.data.frame(tslaX), method = c("BoxCox","center","scale"))
@@ -790,70 +844,210 @@ propVar_pcaTslaX #proportion of variance explained by each PCs
 #Check extreme observations via PCA
 
 ggplot(data = pcaTslaX)+
-  geom_point(aes(x = PC1, y= PC2),color = ifelse(tslaY < 0,'red','blue'))
+  geom_point(aes(x = PC1, y= PC2))
 
 ggplot(data = pcaTslaX)+
-  geom_point(aes(x = PC3, y= PC2),color = ifelse(tslaY < 0,'red','blue'))
+  geom_point(aes(x = PC3, y= PC2))
 
 ggplot(data = pcaTslaX)+
-  geom_point(aes(x = PC1, y= PC3),color = ifelse(tslaY < 0,'red','blue'))
+  geom_point(aes(x = PC1, y= PC3))
 
 plot3D::scatter3D(pcaTslaX$PC1, pcaTslaX$PC2, pcaTslaX$PC3, pch = 16,  
                   theta = 20, phi = 20, main = "PCA - Tesla", xlab = "PC1", 
                   ylab ="PC2", zlab = "PC3", bty = "g", ticktype = "detailed")
 
-#Stock Return vs PCs
+#diffHighLow vs PCs
 ggplot(data = pcaTslaX)+
-  geom_point(aes(x = PC1, y=tslaY$stockReturn),color = ifelse(tslaY$stockReturn < 0  ,'red','green'))
+  geom_point(aes(x = PC1, y=tslaY$diffHighLowTomorrow), color=ifelse(tslaY$diffHighLowTomorrow > mean(tslaY$diffHighLowTomorrow),"red", "blue"))
 
 ggplot(data = pcaTslaX)+
-  geom_point(aes(x = PC2, y=tslaY$stockReturn),color = ifelse(tslaY$stockReturn < 0  ,'red','green'))
+  geom_point(aes(x = PC1, y=tslaY$diffHighLowTomorrow)
+, color=ifelse(tslaX$diffHighLow > mean(tslaX$diffHighLow),"red", "blue"))
 
-#There's no need to fit a PCA regression model, because the correlations between daily stock return and 9 PCs are almost zero. 
-hclustPlotF(cbind(tslaY,pcaTslaX))
+ggplot(data = pcaTslaX)+
+  geom_point(aes(x = PC1, y=tslaY$diffHighLowTomorrow)
+, color=ifelse(tslaX$stockReturn > mean(tslaX$stockReturn),"red", "blue"))
+
+ggplot(data = pcaTslaX)+
+  geom_point(aes(x = PC2, y=tslaY$diffHighLowTomorrow), color=ifelse(tslaY$diffHighLowTomorrow > mean(tslaY$diffHighLowTomorrow),"red", "blue"))
+
+ggplot(data = pcaTslaX)+
+  geom_point(aes(x = PC2, y=tslaY$diffHighLowTomorrow)
+, color=ifelse(tslaX$diffHighLow > mean(tslaX$diffHighLow),"red", "blue"))
+
+ggplot(data = pcaTslaX)+
+  geom_point(aes(x = PC2, y=tslaY$diffHighLowTomorrow)
+, color=ifelse(tslaX$stockReturn > mean(tslaX$stockReturn),"red", "blue"))
+
+ggplot(data = pcaTslaX)+
+  geom_point(aes(x = PC3, y=tslaY$diffHighLowTomorrow)
+             , color=ifelse(tslaY$diffHighLowTomorrow > mean(tslaY$diffHighLowTomorrow),"red", "blue"))
+
+ggplot(data = pcaTslaX)+
+  geom_point(aes(x = PC3, y=tslaY$diffHighLowTomorrow)
+, color=ifelse(tslaX$diffHighLow > mean(tslaX$diffHighLow),"red", "blue"))
+
+ggplot(data = pcaTslaX)+
+  geom_point(aes(x = PC3, y=tslaY$diffHighLowTomorrow)
+, color=ifelse(tslaX$stockReturn > mean(tslaX$stockReturn),"red", "blue"))
+
+scatterplot3d::scatterplot3d(x = pcaTslaX$PC1, y = pcaTslaX$PC2,
+                             z = tslaY$diffHighLowTomorrow, pch = 16, color = ifelse(tslaY$diffHighLowTomorrow > mean(tslaY$diffHighLowTomorrow),"red", "blue"))
+
+#stockReturn vs PCs
+
+ggplot(data = pcaTslaX)+
+  geom_point(aes(x = PC1, y=tslaY$stockReturnTomorrow), color=ifelse(tslaX$stockReturn > mean(tslaX$stockReturn),"red", "blue"))
+
+ggplot(data = pcaTslaX)+
+  geom_point(aes(x = PC1, y=tslaY$stockReturnTomorrow), color=ifelse(tslaX$diffHighLow > mean(tslaX$diffHighLow),"red", "blue")) 
+
+ggplot(data = pcaTslaX)+
+  geom_point(aes(x = PC1, y=tslaY$stockReturnTomorrow), color=ifelse(tslaX$stockReturn > mean(tslaX$stockReturn),"red", "blue"))
+
+ggplot(data = pcaTslaX)+
+  geom_point(aes(x = PC2, y=tslaY$stockReturnTomorrow))
+
+ggplot(data = pcaTslaX)+
+  geom_point(aes(x = PC3, y=tslaY$stockReturnTomorrow))
+
+
 ```
 
 
 ```{r dummyVarForLogisticRegression}
 #hist(tslaReg$stockReturn, breaks=20, freq=FALSE,main = paste("Density Plot - ",names(tslaReg$stockReturn)),xlab = " ") # stock return is normally distributed.
 
-XtslaAddLevels = tslaX %>%
+XtslaAddLevels = tslaFull %>%
   mutate(aboveR1 = factor(ifelse(PX_HIGH > R1, "Yes", "No"))) %>%
   mutate(aboveR2 = factor(ifelse(PX_HIGH > R2, "Yes", "No"))) %>%
   mutate(aboveR3 = factor(ifelse(PX_HIGH > R3, "Yes", "No"))) %>%
   mutate(belowS1 = factor(ifelse(PX_LOW  < S1, "Yes", "No"))) %>%
   mutate(belowS2 = factor(ifelse(PX_LOW  < S2, "Yes", "No"))) %>%
   mutate(belowS3 = factor(ifelse(PX_LOW  < S3, "Yes", "No"))) %>%
-  select(aboveR1, aboveR2, aboveR3, belowS1, belowS2, belowS3)                   
-
-YtslaAddLevels =  factor(ifelse(tslaY$stockReturn > 0, "Increased", "Decreased"))
+  select(aboveR1, aboveR2, aboveR3, belowS1, belowS2, belowS3)            
 XtslaDummyModel = caret::dummyVars(~ ., data = XtslaAddLevels, fullRank = TRUE)
+
+YtslaAddLevels = as_tibble(factor(ifelse(tslaY$stockReturnTomorrow > 0, "Increased", "Decreased"))) 
+
 YtslaDummyModel = caret::dummyVars(~ ., data = YtslaAddLevels, fullRank = TRUE)
 
 XtslaDummy = as_tibble(predict(XtslaDummyModel, XtslaAddLevels))
 YtslaDummy = as_tibble(predict(YtslaDummyModel, YtslaAddLevels))
-YtslaDummy = factor(ifelse(tslaY$stockReturn > 0, "Increased", "Decreased"))
 
-XtslaLogReg = tslaX %>%
+names(YtslaDummy)[1] = "stockReturnTomorrowDummy" #Y2
+
+tslaLogReg = tslaFull %>%
   mutate(XtslaDummy) %>% 
-  dplyr::select(-R1,-S1,-R2,-S2,-R3,-S3)#Drop PP, R1, R2, R3, S1, S2, S3 
+  dplyr::select(-R1,-S1,-R2,-S2,-R3,-S3) %>% 
+  #Drop PP, R1, R2, R3, S1, S2, S3 
+  mutate(YtslaDummy) 
+
 ```
 
-```{r removeHighCorr}
-hclustPlotF(cbind(tslaY,XtslaLogReg))
-highCorrTsla = highCorrF(XtslaLogReg,0.8)
-hclustPlotF(XtslaLogReg)
-tslaLogRegRemoveCorr = select(XtslaLogReg, -highCorrTsla)
+#```{r removeHighCorr}
+hclustPlotF(tslaLogReg)
+XtslaLogReg = tslaLogReg %>%
+  select(-diffHighLowTomorrow, -stockReturnTomorrow,-stockReturnTomorrowDummy)
+
+highCorrTsla = highCorrF(tslaFull,0.8)
+highCorrTsla
+
+tslaLogRegRemoveCorr = XtslaLogReg %>% select(-highCorrTsla)
 hclustPlotF(tslaLogRegRemoveCorr)
+#```
+
+```{r linearRegression}
+#First, correct skewness
+tslaXyeoJ = tslaX %>%
+  caret::preProcess(method = "YeoJohnson") %>%
+  predict(newdata = tslaX)
+
+#hist(tslaY$diffHighLowTomorrow)
+#hist(tslaY$stockReturnTomorrow)
+tslaYyeoJ = tslaY %>%
+  caret::preProcess(method = "YeoJohnson") %>%
+  predict(newdata = tslaY)
+#hist(tslaYyeoJ$diffHighLowTomorrow)
+#hist(tslaYyeoJ$stockReturnTomorrow)
+
+Ktsla = 25
+cvIndexTsla = caret::createFolds(tslaYyeoJ$diffHighLowTomorrow, k = Ktsla, returnTrain = TRUE)
+trControl = trainControl(method = "cv", index = cvIndexTsla)
+
+XtslaPenalty = tslaXyeoJ %>%
+  caret::preProcess(method = c("center","scale")) %>%
+  predict(tslaXyeoJ) %>%
+  cbind(.,XtslaDummy) %>%
+  dplyr::select(-R1,-S1,-R2,-S2,-R3,-S3)
+
+YtslaPenalty = tslaYyeoJ %>%
+  caret::preProcess(method = c("center","scale")) %>%
+  predict(newdata = tslaYyeoJ)
+
+lmOutTsla = train(x = XtslaPenalty, y = YtslaPenalty$diffHighLowTomorrow, method = "lm", trControl = trControl)
+
+lmOutTsla
+```
+
+```{r penalizedRegression}
+#Errors in ridge and lasso regression are solved by removing highly correlated features in XtslaPenalty
+highCorrTsla = XtslaPenalty %>% highCorrF(.,0.8) %>%
+              .[-c(25,27)] %>%
+  c(.,c("macdPrice","macdVolume")) 
+XtslaLogRegRemoveCorr = XtslaPenalty %>% select(-highCorrTsla)
+
+#ridge regression
+ridgeOutTsla = train(x = XtslaLogRegRemoveCorr, y = YtslaPenalty$diffHighLowTomorrow, method = "ridge", tuneLength = 10,trControl = trControl)
+
+ridgeOutTsla
+
+#lasso regression
+lassoOutTsla = train(x = XtslaLogRegRemoveCorr, y = YtslaPenalty$diffHighLowTomorrow, method = "lasso", tuneLength = 10,trControl = trControl)
+
+lassoOutTsla
+
+#elastic net
+gridLambdaAlpha = expand.grid(lambda = seq(1e-6, 0.05, length = 15), alpha = c(0,0.25,.5,.75,1))
+
+enetOutTsla = train(x = XtslaPenalty, y = YtslaPenalty$diffHighLowTomorrow,
+                method = "glmnet", tuneGrid = gridLambdaAlpha, trControl = trControl)
+
+enetOutTsla
+
+plot(enetOutTsla, xlab = "Lambda (Elastic Net Penalty)", ylab = "RMSE (K-fold CV)" )
+
+#Results of penalized linear model
+names(enetOutTsla$finalModel)
+
+alphaHatTsla  = enetOutTsla$finalModel$tuneValue$alpha
+lambdaHatTsla = enetOutTsla$finalModel$tuneValue$lambda
+
+```
+
+>Tesla (TSLA)
+
+The CV - minimizing values are alpha = `r alphaHatTsla` and lambda = `r lambdaHatTsla`.
+Next, refit the model with this alpha by calling "glmnet" directly and select the lambdaHat that minimized CV. 
+
+Use results from  Elastic Net Regression to find coefficients Beta's.
+
+```{r betaPenalizedRegression}
+glmnetOutTsla = glmnet::glmnet(x = as.matrix(XtslaPenalty), y = YtslaPenalty$diffHighLowTomorrow, alpha = alphaHatTsla, standardize = FALSE)
+betaHatTsla = coef(glmnetOutTsla, s = lambdaHatTsla)
+betaHatTsla
+##Question: Collinearity in Elastic Net regression
 ```
 
 Many features in our data are not normally distributed, which violates the normality assumption for LDA. Thus, we'll fit our data with a logistic regression model. 
 
-```{r logisticRegression}
+#```{r logisticRegression}
+
 trControl = trainControl(method = 'none')
 tslaOutLogistic = train(x = XtslaLogReg, y = YtslaDummy, method = 'glm', trControl = trControl)
 
 summary(tslaOutLogistic)
+
 
 #Forward Selection
 tslaOutForward = leaps::regsubsets(x =tslaLogRegRemoveCorr, y = factor(YtslaDummy$value.Increased), nvmax=ncol(tslaLogRegRemoveCorr), method='forward')
@@ -869,7 +1063,23 @@ XtslaForward = as_tibble(select(XtslaFull, diffHighLow2  , diffLastOpen1,ASK_dif
 tslaOutLogistic2 = caret::train(x = XtslaForward, y = YtslaFull, method = 'lm', trControl = trControl)
 summary(tslaOutLogistic2)
 
-```
+##alternative:use glm() and library(mass)
+library(MASS)
+XtslaLogReg = tslaLogReg %>%
+  select(-diffHighLowTomorrow, -stockReturnTomorrow,-stockReturnTomorrowDummy)
+
+tslaOutLogistic = glm(stockReturnTomorrowDummy ~ ., family = binomial, data = tslaLogReg)
+
+summary(tslaOutLogistic)
+library(bestglm)
+tslaBestGLM = 
+tslaBestGlmFit = bestglm::bestglm(dataframeWithYatLast, family = binomial, IC="BIC")
+
+tlsaLinearRegFull = tslaFull %>%
+  select(-stockReturnTomorrow)
+
+
+#```
 
 The selected logistic model has very low R-squared but all coefficients 
 
@@ -890,30 +1100,10 @@ The selected logistic model has very low R-squared but all coefficients
 
 ```
 
+##### 6 - Neural Networks
 
 
+##### 7 - SVM
 
 
-##### 5.x Potential Problems
-###### 5.x.1 correlation of error term(residuals)
-###### 5.x.2 outliers
-
-
-##### 6 - Time Series Analysis
-```{r timeSeriesAnalysis}
-#Check stationarity
-cuberoot=function(x){
-    x=sign(x)*abs(x)^(1/3)
-  }
-require(graphics)
-par(mfrow=c(2,2))
-tslaTsPlot = tslaReg %>% 
-  apply(., 2, function(x) {diff(diff(cuberoot(x)))}) %>%
-  apply(., 2, ts.plot)
-
-tslaACF = tslaReg %>% 
-  apply(., 2, function(x) {diff(diff(cuberoot(x)))}) %>%
-  apply(., 2, acf)
-```
-
-##### 7 - Clustering
+##### 8 - Random Forest
