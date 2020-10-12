@@ -971,7 +971,7 @@ tslaYyeoJ = tslaY %>%
 #hist(tslaYyeoJ$diffHighLowTomorrow)
 #hist(tslaYyeoJ$stockReturnTomorrow)
 
-Ktsla = 25
+Ktsla = 10
 cvIndexTsla = caret::createFolds(tslaYyeoJ$diffHighLowTomorrow, k = Ktsla, returnTrain = TRUE)
 trControl = trainControl(method = "cv", index = cvIndexTsla)
 
@@ -995,15 +995,20 @@ lmOutTsla
 highCorrTsla = XtslaPenalty %>% highCorrF(.,0.8) %>%
               .[-c(25,27)] %>%
   c(.,c("macdPrice","macdVolume")) 
-XtslaLogRegRemoveCorr = XtslaPenalty %>% select(-highCorrTsla)
+XtslaRegRemoveCorr = XtslaPenalty %>% select(-highCorrTsla)
+
+names(XtslaPenalty)
+names(XtslaLogRegRemoveCorr)
 
 #ridge regression
-ridgeOutTsla = train(x = XtslaLogRegRemoveCorr, y = YtslaPenalty$diffHighLowTomorrow, method = "ridge", tuneLength = 10,trControl = trControl)
+ridgeOutTsla = train(x = XtslaRegRemoveCorr, y = YtslaPenalty$diffHighLowTomorrow, method = "ridge", tuneLength = 10,trControl = trControl)
 
 ridgeOutTsla
 
+ridgeOutTsla = train(x = XtslaPenalty, y = YtslaPenalty$diffHighLowTomorrow, method = "ridge", tuneLength = 10,trControl = trControl)
+
 #lasso regression
-lassoOutTsla = train(x = XtslaLogRegRemoveCorr, y = YtslaPenalty$diffHighLowTomorrow, method = "lasso", tuneLength = 10,trControl = trControl)
+lassoOutTsla = train(x = XtslaRegRemoveCorr, y = YtslaPenalty$diffHighLowTomorrow, method = "lasso", tuneLength = 10,trControl = trControl)
 
 lassoOutTsla
 
