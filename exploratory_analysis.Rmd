@@ -30,8 +30,9 @@ library(plot3D)   #PCs plot
 library(RcppRoll) #CMF
 library(TTR)      #Calculate Indicators: EMA,SMA,RSI
 library(leaps)    #Stepwise Model Selection
-library(zoo) # Interpolation
+library(zoo)      # Interpolation
 library(elasticnet) #ridge, lasso, elastic net regression
+library(keras)    #Neural Networks
 
 knitr::opts_chunk$set(echo = T)
 ```
@@ -508,21 +509,7 @@ sapply(googSelected,function(x){length(unique(x))})
 All `r ncol(tslaSelected)` selected variables in Tesla stock data are quantitative.  
 All `r ncol(googSelected)` selected variables in Google stock data are quantitative.
 
-Before making any changes, let's take a look on the data structures. 
-```{r dataStructure}
-#Tsla
-#str(tslaSelected)
-sapply(tsla,function(x){length(unique(x))})
-#summary(tsla)
 
-#Goog
-#str(googSelected)
-sapply(goog,function(x){length(unique(x))})
-#summary(tslaSelected)
-```
-
-All `r ncol(tslaSelected)` selected variables in Tesla stock data are quantitative.  
-All `r ncol(googSelected)` selected variables in Google stock data are quantitative.
 
 
 ```{r highCorr}
@@ -704,10 +691,12 @@ tslaAddK = tslaAddSMA %>%
 daysMACDslow   = 26 #default nSlow
 daysMACDfast   = 12 #default nFast
 daysMACDsignal = 9  #default nSig
+
 tslaAddMACD = tslaAddK %>%
-  mutate(macdPrice = TTR::MACD(PX_LAST, nFast = daysMACDfast, nSlow = daysMACDslow, nSig = daysMACDsignal)) %>%
+  mutate(macdPrice = (TTR::MACD(PX_LAST, nFast = daysMACDfast, nSlow = daysMACDslow, nSig = daysMACDsignal))[,1]) %>%
   #mutate(macdPrice = TTR::MACD(nFast = 12, nSlow = 26, nSig = 9, maType="WMA", wts=PX_VOLUME)) %>% # weighted macdPrice
-  mutate(macdVolume = TTR::MACD(PX_VOLUME, nFast = daysMACDfast, nSlow = daysMACDslow, nSig = daysMACDsignal))
+  mutate(macdVolume = (TTR::MACD(PX_VOLUME, nFast = daysMACDfast, nSlow = daysMACDslow, nSig = daysMACDsignal))[,1])
+
 
 ```
 
@@ -804,19 +793,17 @@ tslaY  = tslaAddCCI %>%
 
 tslaX    = tslaAddCCI %>%
   na.omit() %>%
-  .[1:(nrow(tslaAddCCIRemoveNA)-1),] %>%
+  .[1:(nrow(.)-1),] %>%
   dplyr::as_tibble(.) 
 
 names(tslaY)[1] = "diffHighLowTomorrow" #Y1
 names(tslaY)[2] = "stockReturnTomorrow" #Y2
 
-tslaFull = as_tibble(cbind(tslaY,tslaX))
-
-hclustPlotF(tslaFull)
+tslaFull = dplyr::as_tibble(cbind(tslaY,tslaX))
 
 #Correlation between stock data of today and difference between highest and lowest stock prices on tomorrow is much higher than correlation between stock data of today and daily stock return on tomorrow. Thus, it's suggested to use "diffHighLowTomorrow " as the supervisor in model fitting.
 
-summary(tslaY$diffHighLowTomorrow)
+#summary(tslaY$diffHighLowTomorrow)
 
 ```
 
@@ -1089,10 +1076,27 @@ tlsaLinearRegFull = tslaFull %>%
 The selected logistic model has very low R-squared but all coefficients 
 
 ```{r dataSplit}
-#training set
-#validation set
-#test set
+set.seed(1989)
+YtslaNN = YtslaPenalty %>% mutate(YtslaDummy)
+trainIndex = caret::createDataPartition(YtslaNN$diffHighLowTomorrow, p = 0.25, list = FALSE)
+YtslaTrain_DiffHighLow      = YtslaNN$diffHighLowTomorrow[trainIndex]
+YtslaTrain_StockReturn      = YtslaNN$stockReturnTomorrow[trainIndex]
+YtslaTrain_StockReturnDummy = YtslaNN$stockReturnTomorrowDummy[trainIndex]
+
+YtslaTest_DiffHighLow       = YtslaNN$diffHighLowTomorrow[-trainIndex]
+YtslaTest_StockReturn       = YtslaNN$stockReturnTomorrow[-trainIndex]
+YtslaTest_StockReturnDummy  = YtslaNN$stockReturnTomorrowDummy [-trainIndex]
+#Standardize quantitative features before fitting neural networks because NN is scale dependent. 
+XtslaNN = tslaLogReg %>%
+select(-c(aboveR1.Yes,aboveR2.Yes,aboveR3.Yes,belowS1.Yes,belowS2.Yes,belowS3.Yes,diffHighLowTomorrow,stockReturnTomorrow,stockReturnTomorrowDummy))
+
+XtslaNNScaledFit = caret::preProcess(XtslaNN,method = c("center","scale")) 
+XtslaNNScaled    = predict(XtslaNNScaledFit,XtslaNN)
+
+XtslaTrain = XtslaNNScaled[trainIndex,]
+XtslaTest  = XtslaNNScaled[-trainIndex,]
 ```
+
 ```{r logisticRegressionAfterDataSplit}
 #Select tuning parameters with validation set
 #Fit logistic models with training set
@@ -1107,9 +1111,13 @@ The selected logistic model has very low R-squared but all coefficients
 
 ##### 6 - Neural Networks
 ```{r scatterPlots}
-pool = 1:47
-
-pairs(tslaAddCCI[,1:16], pch = 19, lower.panel = NULL)
+library(keras)
+ncol(XtslaTrain)
+tslaNNFit = keras::keras_model_sequential() %>%
+  keras::layer_flatten() %>%
+  keras::layer_dense(units = 16,activation = "relu", name = "L1") %>%
+  keras::layer_dense(units = 16,activation = "relu", name = "L2") %>%
+  keras::layer_dense(units = 2, activation = "softmax", name = "output")
 
 
 ```
