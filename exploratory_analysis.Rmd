@@ -1112,11 +1112,16 @@ XtslaTest  = XtslaNNScaled[-trainIndex,]
 ##### 6 - Neural Networks
 ```{r scatterPlots}
 library(keras)
-devtools::install_github("rstudio/tensorflow")
-devtools::install_github("rstudio/keras")
 
-tensorflow::install_tensorflow()
-tensorflow::tf_config()
+#To get started, install the tensorflow R package from GitHub as follows:
+
+devtools::install_github("rstudio/tensorflow")
+#Then, use the install_tensorflow() function to install TensorFlow:
+
+library(tensorflow)
+install_tensorflow()
+
+
 
 ncol(XtslaTrain)
 tslaNNFit = keras::keras_model_sequential() %>%
@@ -1126,10 +1131,10 @@ tslaNNFit = keras::keras_model_sequential() %>%
   keras::layer_dense(units = 2, activation = "softmax", name = "output")
 
 keras::conv_base
-
+devtools::install_github("rstudio/tensorflow")
 
 tslaNNFit = keras::keras_model_sequential() %>%
-  conv_base %>%
+  XtslaNNScaled %>%
   layer_flatten() %>%
   keras::layer_dense(units = 16,activation = "relu", name = "L1") %>%
   keras::layer_dense(units = 16,activation = "relu", name = "L2") %>%
