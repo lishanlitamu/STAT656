@@ -1113,6 +1113,7 @@ XtslaTest  = XtslaNNScaled[-trainIndex,]
 ```{r scatterPlots}
 library(keras)
 
+
 #To get started, install the tensorflow R package from GitHub as follows:
 
 devtools::install_github("rstudio/tensorflow")
