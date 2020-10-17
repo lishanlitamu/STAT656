@@ -1106,7 +1106,13 @@ The selected logistic model has very low R-squared but all coefficients
 ```
 
 ##### 6 - Neural Networks
+```{r scatterPlots}
+pool = 1:47
 
+pairs(tslaAddCCI[,1:16], pch = 19, lower.panel = NULL)
+
+
+```
 
 ##### 7 - SVM
 
