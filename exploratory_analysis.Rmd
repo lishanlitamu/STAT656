@@ -33,7 +33,7 @@ library(leaps)    #Stepwise Model Selection
 library(zoo)      # Interpolation
 library(elasticnet) #ridge, lasso, elastic net regression
 library(keras)    #Neural Networks
-
+library(tensorflow)
 knitr::opts_chunk$set(echo = T)
 ```
 
@@ -1112,6 +1112,12 @@ XtslaTest  = XtslaNNScaled[-trainIndex,]
 ##### 6 - Neural Networks
 ```{r scatterPlots}
 library(keras)
+devtools::install_github("rstudio/tensorflow")
+devtools::install_github("rstudio/keras")
+
+tensorflow::install_tensorflow()
+tensorflow::tf_config()
+
 ncol(XtslaTrain)
 tslaNNFit = keras::keras_model_sequential() %>%
   keras::layer_flatten() %>%
@@ -1119,7 +1125,17 @@ tslaNNFit = keras::keras_model_sequential() %>%
   keras::layer_dense(units = 16,activation = "relu", name = "L2") %>%
   keras::layer_dense(units = 2, activation = "softmax", name = "output")
 
+keras::conv_base
 
+
+tslaNNFit = keras::keras_model_sequential() %>%
+  conv_base %>%
+  layer_flatten() %>%
+  keras::layer_dense(units = 16,activation = "relu", name = "L1") %>%
+  keras::layer_dense(units = 16,activation = "relu", name = "L2") %>%
+  keras::layer_dense(units = 2, activation = "softmax", name = "output")
+
+tensorflow.keras
 ```
 
 ##### 7 - SVM
