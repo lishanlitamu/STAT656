@@ -1111,7 +1111,7 @@ XtslaTest  = XtslaNNScaled[-trainIndex,]
 
 ##### 6 - Neural Networks
 ```{r scatterPlots}
-#library(keras)
+library(keras)
 
 #To get started, install the tensorflow R package from GitHub as follows:
 
@@ -1120,7 +1120,9 @@ devtools::install_github("rstudio/tensorflow")
 
 library(tensorflow)
 tensorflow::install_tensorflow()
-
+test = tensorflow::
+hello <-tensorflow::tf$constant("Hello")
+print(hello)
 
 reticulate::conda_create("my-environment")
 reticulate::use_condaenv("my-environment", required = TRUE)
