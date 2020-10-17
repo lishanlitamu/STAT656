@@ -32,8 +32,8 @@ library(TTR)      #Calculate Indicators: EMA,SMA,RSI
 library(leaps)    #Stepwise Model Selection
 library(zoo)      # Interpolation
 library(elasticnet) #ridge, lasso, elastic net regression
-library(keras)    #Neural Networks
-library(tensorflow)
+#library(keras)    #Neural Networks
+#library(tensorflow)
 knitr::opts_chunk$set(echo = T)
 ```
 
@@ -1111,8 +1111,7 @@ XtslaTest  = XtslaNNScaled[-trainIndex,]
 
 ##### 6 - Neural Networks
 ```{r scatterPlots}
-library(keras)
-
+#library(keras)
 
 #To get started, install the tensorflow R package from GitHub as follows:
 
@@ -1120,8 +1119,11 @@ devtools::install_github("rstudio/tensorflow")
 #Then, use the install_tensorflow() function to install TensorFlow:
 
 library(tensorflow)
-install_tensorflow()
+tensorflow::install_tensorflow()
 
+
+reticulate::conda_create("my-environment")
+reticulate::use_condaenv("my-environment", required = TRUE)
 
 
 ncol(XtslaTrain)
@@ -1131,8 +1133,6 @@ tslaNNFit = keras::keras_model_sequential() %>%
   keras::layer_dense(units = 16,activation = "relu", name = "L2") %>%
   keras::layer_dense(units = 2, activation = "softmax", name = "output")
 
-keras::conv_base
-devtools::install_github("rstudio/tensorflow")
 
 tslaNNFit = keras::keras_model_sequential() %>%
   XtslaNNScaled %>%
