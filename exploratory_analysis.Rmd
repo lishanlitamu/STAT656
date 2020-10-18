@@ -27,7 +27,7 @@ library(stringr) # Goggle news scrape
 library(tau)
 library(textdata)
 library(plot3D)   #PCs plot
-library(RcppRoll) #CMF
+#library(RcppRoll) #CMF
 library(TTR)      #Calculate Indicators: EMA,SMA,RSI
 library(leaps)    #Stepwise Model Selection
 library(zoo)      # Interpolation
@@ -1111,21 +1111,23 @@ XtslaTest  = XtslaNNScaled[-trainIndex,]
 
 ##### 6 - Neural Networks
 ```{r scatterPlots}
-library(keras)
 
-#To get started, install the tensorflow R package from GitHub as follows:
+remove.packages("keras")
+remove.packages("tensorflow")
 
-devtools::install_github("rstudio/tensorflow")
-#Then, use the install_tensorflow() function to install TensorFlow:
+require(reticulate)
 
-library(tensorflow)
-tensorflow::install_tensorflow()
-test = tensorflow::
-hello <-tensorflow::tf$constant("Hello")
-print(hello)
+reticulate::use_python("D:/Programs/anaconda3/python.exe", required = TRUE)
 
-reticulate::conda_create("my-environment")
-reticulate::use_condaenv("my-environment", required = TRUE)
+reticulate::use_condaenv("D:/Programs/anaconda3")
+reticulate::py_config() 
+devtools::install_github("rstudio/keras", type = "source", dependencies = TRUE)
+devtools::install_github("rstudio/tensorflow", type = "source", dependencies = TRUE)
+
+require(reticulate)
+reticulate::use_python("D:/Programs/anaconda3/python.exe", required = TRUE)
+reticulate::use_condaenv("D:/Programs/anaconda3")
+keras::install_keras()  
 
 
 ncol(XtslaTrain)
