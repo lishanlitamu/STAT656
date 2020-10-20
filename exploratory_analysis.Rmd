@@ -19,6 +19,7 @@ library(data.table) # Faster CSV reader than base
 library(dplyr)
 library(e1071)
 library(ggplot2) # General plotting
+library(GuardianR) # Guardian API scrape
 library(newsanchor) # News API scrape
 library(readxl)
 library(rtweet) # Twitter scrape
@@ -34,6 +35,7 @@ library(zoo)      # Interpolation
 library(elasticnet) #ridge, lasso, elastic net regression
 #library(keras)    #Neural Networks
 #library(tensorflow)
+
 knitr::opts_chunk$set(echo = T)
 ```
 
@@ -364,91 +366,54 @@ corrplot::corrplot(corrGoog, order="hclust")
 #### Fig. 2.4 Correlations between features - Google
 
 ### 3 - News Scraping
-#### 3.1 Google News
 
-```{r google_news_scrape}
-## Define search strings on Google News
-tsla_search <- read_html("https://news.google.com/search?q=TSLA%20when%3A10y&hl=en-US&gl=US&ceid=US%3Aen")
-goog_search <- read_html("https://news.google.com/search?q=GOOG%20when%3A10y&hl=en-US&gl=US&ceid=US%3Aen")
+```{r nees_scrape}
+## Guardian API key
+api_key <- "d02efa1b-b4a4-4e20-a7f5-eee62d80cbf6"
 
-## Extract headlines
-tsla_headlines <- tsla_search %>%
-  rvest::html_nodes("article") %>% rvest::html_text("span") %>%
-  stringr::str_split("(?<=[a-z0-9!?\\.])(?=[A-Z])") # Clean strings
-tsla_headlines <- base::sapply(tsla_headlines, function(x) x[1]) # Extract only the first elements
+## Query Guardian for TSLA news
+tsla_news <- GuardianR::get_guardian("Tesla", from.date = "2010-09-01", 
+                                     to.date = "2020-09-01", api.key = api_key)
+tsla_news <- tsla_news[, 4:5] # Extract relevant columns only
 
-goog_headlines <- goog_search %>%
-  rvest::html_nodes("article") %>% rvest::html_text("span") %>%
-  stringr::str_split("(?<=[a-z0-9!?\\.])(?=[A-Z])") # Clean strings
-goog_headlines <- base::sapply(goog_headlines, function(x) x[1]) # Extract only the first elements
+## Format date column
+tsla_news$webPublicationDate <- base::as.Date(base::substr(tsla_news$webPublicationDate, 1, 10), 
+                                              "%Y-%m-%d")
 
-## Extract the time since the headline
-tsla_time <- tsla_search %>% rvest::html_nodes("div article div div time") %>% rvest::html_text()
-goog_time <- goog_search %>% rvest::html_nodes("div article div div time") %>% rvest::html_text()
 
-## Create data frame
-tsla_news <- base::data.frame("Date" = tsla_time, "Headline" = tsla_headlines, stringsAsFactors = F)
-goog_news <- base::data.frame("Date" = goog_time, "Headline" = goog_headlines, stringsAsFactors = F)
+goog_news <- GuardianR::get_guardian("Google", from.date = "2014-03-27", 
+                                     to.date = "2020-09-01", api.key = api_key)
+goog_news <- goog_news[, 4:5] # Extract relevant columns only
 
-## Format date columns
+## Format date column
+goog_news$webPublicationDate <- base::as.Date(base::substr(goog_news$webPublicationDate, 1, 10), 
+                                              "%Y-%m-%d")
+
+## Get positive and negative words from Loughran and McDonald
+positive_words <- base::data.frame(
+  readxl::read_excel("2 - Word Lists/LoughranMcDonald_SentimentWordLists_2018.xlsx",
+                     sheet = "Positive", col_names = F))$...1
+
+negative_words <- base::data.frame(
+  readxl::read_excel("2 - Word Lists/LoughranMcDonald_SentimentWordLists_2018.xlsx",
+                     sheet = "Negative", col_names = F))$...1
+
+tsla_news$Sentiment <- NA
 for (row in 1:base::nrow(tsla_news)) {
-  # If news was hours ago, set date as today
-  if (base::grepl("hours ago", tsla_news[row, ]$Date)) {tsla_news[row, ]$Date <- Sys.Date()}
-  #
-  else if (base::grepl("Yesterday", tsla_news[row, ]$Date)) {tsla_news[row, ]$Date <- Sys.Date() - 1}
-  # If news was days ago, set date as today minus the number of days
-  else if (base::grepl("days ago", tsla_news[row, ]$Date)) {tsla_news[row, ]$Date <- Sys.Date() - base::as.numeric(base::substr(tsla_news[row, ]$Date, 1, 1))}
-  # If news has a date, format it as a date
-  else {tsla_news[row, ]$Date <- base::as.Date(paste0(tsla_news[row, ]$Date, " 2020"), "%b %d %Y")}
+  tmp <- base::strsplit(tsla_news[row, ]$webTitle, "[[:space:]]|(?=[.!?])", perl = T)[[1]]
+  
+  sentiment <- 0
+  if (base::nchar(word) > 1) {
+      for (word in tmp) {
+        if (base::any(stringr::str_detect(positive_words, stringr::regex(word, ignore_case = T)))) {
+          sentiment <- sentiment + 1
+        } else if (base::any(stringr::str_detect(negative_words, stringr::regex(word, ignore_case = T)))) {
+          sentiment <- sentiment - 1
+        }
+      }
+  tsla_news[row, ]$Sentiment <- sentiment
+  }
 }
-tsla_news$Date <- base::as.Date(base::as.numeric(tsla_news$Date), origin = "1970-01-01")
-
-for (row in 1:base::nrow(goog_news)) {
-  # If news was hours ago, set date as today
-  if (base::grepl("hours ago", goog_news[row, ]$Date)) {goog_news[row, ]$Date <- Sys.Date()}
-  #
-  else if (base::grepl("Yesterday", goog_news[row, ]$Date)) {goog_news[row, ]$Date <- Sys.Date() - 1}
-  # If news was days ago, set date as today minus the number of days
-  else if (base::grepl("days ago", goog_news[row, ]$Date)) {goog_news[row, ]$Date <- Sys.Date() - base::as.numeric(base::substr(goog_news[row, ]$Date, 1, 1))}
-  # If news has a date, format it as a date
-  else {goog_news[row, ]$Date <- base::as.Date(paste0(goog_news[row, ]$Date, " 2020"), "%b %d %Y")}
-}
-goog_news$Date <- base::as.Date(base::as.numeric(goog_news$Date), origin = "1970-01-01")
-```
-
-#### 3.2 News API
-
-```{r news_api_scrape}
-## Save the API key
-api_key <- "5912dc14a8794fecb766c3972b84e63e"
-
-## Search news for TSLA
-tsla_search <- newsanchor::get_headlines_all(query = "Tesla", api_key = api_key)
-tsla_news <- base::data.frame("Date" = tsla_search[["results_df"]][["published_at"]], 
-                              "Headline" = tsla_search[["results_df"]][["title"]], 
-                              stringsAsFactors = F)
-
-## Search news for Google
-goog_search <- newsanchor::get_headlines_all(query = "Google", api_key = api_key)
-goog_news <- base::data.frame("Date" = goog_search[["results_df"]][["published_at"]], 
-                              "Headline" = goog_search[["results_df"]][["title"]], 
-                              stringsAsFactors = F)
-```
-
-#### 3.3 Yahoo Finance News
-
-```{r yahoo_finance_news}
-doc <- xml2::read_html("http://finance.yahoo.com/q/h?s=TSLA+Headlines")
-scope <- doc %>% rvest::html_nodes("#latestQuoteNewsStream-0-Stream")
-dates <- scope %>% rvest::html_nodes("cite span") %>% rvest::html_text()
-headlines <- scope %>% rvest::html_nodes("h3 + ul") %>% 
-  base::lapply(. %>% rvest::html_nodes("li a") %>% rvest::html_text)
-
-# combine both
-do.call(rbind,Map(cbind, dates, headlines))
-
-//*[@id="latestQuoteNewsStream-0-Stream"]/ul/li[15]/div/div/div[2]/h3/a/text()
-//*[@id="latestQuoteNewsStream-0-Stream"]/ul/li[11]/div/div/div[2]/h3/a/text()
 ```
 
 ### 4 - Twitter Scraping
@@ -749,7 +714,7 @@ Up till now, we added xx stock indicators:
 `r names(beforeAfterVar)`
 
 #### Probably delete below codes later ##################
-#```{r addLaggedVariables}
+```{r addLaggedVariables}
 #Add lagged values of features. We'll fit time series models later. This can be a fairly good alternative for TS models, which saves us from running the stationarity test for each feature. 
 
 addLaggedVarF = function(feature, dataForModification, featureName,lagSize ) {
@@ -791,7 +756,8 @@ addDiffVarF = function(dataForModification,nColumn) {
 }
 
 tslaAddDiff =  addDiffVarF(tslaSelected,ncol(tslaSelected))
-#``` #A few added indicators represent moving average of price or volume in a past designated period. Hence, we probably don't need to include lagged values. 
+``` 
+#A few added indicators represent moving average of price or volume in a past designated period. Hence, we probably don't need to include lagged values. 
 #### Probably delete above codes later #######################
 
 Up till now, we added xx stock indicators:
@@ -948,7 +914,7 @@ tslaLogReg = tslaFull %>%
 
 ```
 
-#```{r removeHighCorr}
+```{r removeHighCorr}
 hclustPlotF(tslaLogReg)
 XtslaLogReg = tslaLogReg %>%
   select(-diffHighLowTomorrow, -stockReturnTomorrow,-stockReturnTomorrowDummy)
@@ -958,7 +924,7 @@ highCorrTsla
 
 tslaLogRegRemoveCorr = XtslaLogReg %>% select(-highCorrTsla)
 hclustPlotF(tslaLogRegRemoveCorr)
-#```
+```
 
 ```{r linearRegression}
 #First, correct skewness
@@ -1049,7 +1015,7 @@ betaHatTsla
 
 Many features in our data are not normally distributed, which violates the normality assumption for LDA. Thus, we'll fit our data with a logistic regression model. 
 
-#```{r logisticRegression}
+```{r logisticRegression}
 
 trControl = trainControl(method = 'none')
 tslaOutLogistic = train(x = XtslaLogReg, y = YtslaDummy, method = 'glm', trControl = trControl)
@@ -1087,7 +1053,7 @@ tlsaLinearRegFull = tslaFull %>%
   select(-stockReturnTomorrow)
 
 
-#```
+```
 
 The selected logistic model has very low R-squared but all coefficients 
 
