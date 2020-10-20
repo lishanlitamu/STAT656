@@ -400,6 +400,22 @@ goog_news <- base::data.frame("Date" = goog_search[["results_df"]][["published_a
                               stringsAsFactors = F)
 ```
 
+#### 3.3 Yahoo Finance News
+
+```{r yahoo_finance_news}
+doc <- xml2::read_html("http://finance.yahoo.com/q/h?s=TSLA+Headlines")
+scope <- doc %>% rvest::html_nodes("#latestQuoteNewsStream-0-Stream")
+dates <- scope %>% rvest::html_nodes("cite span") %>% rvest::html_text()
+headlines <- scope %>% rvest::html_nodes("h3 + ul") %>% 
+  base::lapply(. %>% rvest::html_nodes("li a") %>% rvest::html_text)
+
+# combine both
+do.call(rbind,Map(cbind, dates, headlines))
+
+//*[@id="latestQuoteNewsStream-0-Stream"]/ul/li[15]/div/div/div[2]/h3/a/text()
+//*[@id="latestQuoteNewsStream-0-Stream"]/ul/li[11]/div/div/div[2]/h3/a/text()
+```
+
 ### 4 - Twitter Scraping
 
 ```{r twitter_scrape}
