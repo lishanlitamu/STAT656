@@ -1,0 +1,368 @@
+---
+title: "they see me codin'"
+output: html_document
+---
+
+uploadin'
+```{r 1}
+library(stringr)
+library(data.table)
+
+start_time <- Sys.time()
+stocks = dir("Stocks",pattern="*.us.txt", full.names=TRUE)
+
+stock_ticker <- str_match(stocks, "../input/Data/Stocks/(.*?).us.txt")[,2]
+stock_ls <- lapply(stocks, fread)
+names(stock_ls) <- stock_ticker
+stock_dt <- rbindlist(stock_ls, idcol = "Stock_Ticker")
+
+print(Sys.time() - start_time)
+
+
+start_time <- Sys.time()
+
+filename_ETF = dir("ETFs",pattern="*.us.txt", full.names=TRUE)
+
+ETF_ticker <- str_match(filename_ETF, "../input/Data/ETFs/(.*?).us.txt")[,2]
+etf_ls <- lapply(filename_ETF, fread)
+names(etf_ls) <- ETF_ticker
+etf_dt <- rbindlist(etf_ls, idcol = "ETF_Ticker")
+
+print(Sys.time() - start_time)
+
+head(stock_dt)
+head(etf_dt)
+```
+
+pt2
+```{r 2}
+library(class)
+library(dplyr)
+library(lubridate)
+
+set.seed(100)
+
+aapl.us <- read.csv("Stocks/aapl.us.txt")
+amzn.us <- read.csv("Stocks/amzn.us.txt")
+msft.us <- read.csv("Stocks/msft.us.txt")
+fb.us <- read.csv("Stocks/fb.us.txt")
+googl.us <- read.csv("Stocks/googl.us.txt")
+
+
+####APLLE
+stocks<-inner_join(aapl.us[,c(1,5)], amzn.us[,c(1,5)], by = 'Date')
+stocks<-inner_join(stocks, msft.us[,c(1,5)], by = 'Date')
+stocks<-inner_join(stocks, fb.us[,c(1,5)], by = 'Date')
+stocks<-inner_join(stocks, googl.us[,c(1,5)], by = 'Date')
+colnames(stocks)<-c("Date", "Apple", "Amazon", "Microsoft", "Facebook", "Google")
+stocks$lagged<-lag(stocks$Apple)
+stocks$Increase<-ifelse(stocks$Apple > stocks$lagged, "TRUE", "FALSE")
+stocks[1,8]<-"TRUE"
+
+# Apple price chart
+plot(stocks$Apple, type = "l")
+plot(diff(stocks$Apple), type = "l")
+# Apple price chart
+
+# split into train and test samples
+stocks_Apple <- apply(stocks[, 2:6], 2, diff)
+stocks_Apple <- cbind(stocks_Apple, stocks[2:1381,c(1,8)])
+stocksTrain <- as.Date(stocks_Apple$Date, "%Y-%m-%d") < '2017-11-01'
+# split into train and test samples
+
+#model
+# build the model using knn method, set k equal to 1
+predictors <- cbind(lag(stocks_Apple$Apple, default = 3.958), 
+                    lag(stocks_Apple$Amazon, default = 4.26), 
+                    lag(stocks_Apple$Microsoft, default = 0.416), 
+                    lag(stocks_Apple$Facebook, default = -4.20), 
+                    lag(stocks_Apple$Google, default = 6.86))
+
+prediction <- knn(predictors[stocksTrain, ], 
+                  predictors[!stocksTrain, ], stocks_Apple$Increase[stocksTrain], k = 1)
+#model
+
+# model quality
+# display the results and compare the predicted values with the real ones
+# TP = 3 -> the model correctly predicted the next day's rise in stock prices in 3 cases
+# TN = 3 -> the model correctly predicted a fall in stock prices the next day in 3 cases
+# FP = 0 -> the model was not mistaken in predicting a fall in prices
+# FN = 2 -> in 2 cases the model interpreted the growth as a fall
+table(prediction, stocks_Apple$Increase[!stocksTrain])
+# prediction accuracy for k = 1 is 75%
+mean(prediction == stocks_Apple$Increase[!stocksTrain])
+# model quality
+
+# optimal k
+accuracy <- rep(0, 10)
+k <- 1:10
+for(x in 1:10){
+  prediction <- knn(predictors[stocksTrain, ], predictors[!stocksTrain, ],
+                    stocks_Apple$Increase[stocksTrain], k = x)
+  accuracy[x] <- mean(prediction == stocks_Apple$Increase[!stocksTrain])
+}
+# build a graph to determine the optimal k to obtain the highest accuracy
+# (i.e. for a more accurate forecast)
+# so, along the x-axis are the values of k from 1 to 10, along the y - the values of the model accuracy obtained for given k
+
+plot(k, accuracy, type = 'b')
+# optimal k = 7, accuracy - 75%.
+
+
+
+#####AMAZON
+
+stocks<-inner_join(aapl.us[,c(1,5)], amzn.us[,c(1,5)], by = 'Date')
+stocks<-inner_join(stocks, msft.us[,c(1,5)], by = 'Date')
+stocks<-inner_join(stocks, fb.us[,c(1,5)], by = 'Date')
+stocks<-inner_join(stocks, googl.us[,c(1,5)], by = 'Date')
+colnames(stocks)<-c("Date", "Apple", "Amazon", "Microsoft", "Facebook", "Google")
+stocks$lagged<-lag(stocks$Amazon)
+stocks$Increase<-ifelse(stocks$Amazon > stocks$lagged, "TRUE", "FALSE")
+stocks[1,8]<-"TRUE"
+
+
+# Amazon price chart
+plot(stocks$Amazon, type = "l")
+plot(diff(stocks$Amazon), type = "l")
+# Amazon price chart
+
+# split into train and test samples
+stocks_Amazon <- apply(stocks[, 2:6], 2, diff)
+stocks_Amazon <- cbind(stocks_Amazon, stocks[2:1381,c(1,8)])
+stocksTrain <- as.Date(stocks_Amazon$Date, "%Y-%m-%d") < '2017-11-01'
+# split into train and test samples
+
+#model
+# build the model using knn method, set k equal to 1
+predictors <- cbind(lag(stocks_Amazon$Apple, default = 3.958), 
+                    lag(stocks_Amazon$Amazon, default = 4.26), 
+                    lag(stocks_Amazon$Microsoft, default = 0.416), 
+                    lag(stocks_Amazon$Facebook, default = -4.20), 
+                    lag(stocks_Amazon$Google, default = 6.86))
+
+prediction <- knn(predictors[stocksTrain, ], 
+                  predictors[!stocksTrain, ], stocks_Amazon$Increase[stocksTrain], k = 1)
+#model
+
+# model quality
+# display the results and compare the predicted values with the real ones
+# TP = 1 -> the model correctly predicted the rise in stock prices the next day in 1 case
+# TN = 1 -> the model correctly predicted a fall in stock prices the next day in 1 case
+# FP = 3 -> the model interpreted the fall in 3 cases as growth
+# FN = 3 -> the model interpreted the growth in 3 cases as a fall
+table(prediction, stocks_Amazon$Increase[!stocksTrain])
+# the forecast accuracy for k = 1 is 25%
+mean(prediction == stocks_Amazon$Increase[!stocksTrain])
+# model quality
+
+# optimal k
+accuracy <- rep(0, 10)
+k <- 1:10
+for(x in 1:10){
+  prediction <- knn(predictors[stocksTrain, ], predictors[!stocksTrain, ],
+                    stocks_Amazon$Increase[stocksTrain], k = x)
+  accuracy[x] <- mean(prediction == stocks_Amazon$Increase[!stocksTrain])
+}
+
+# build a graph to determine the optimal k to obtain the highest accuracy
+# (i.e. for a more accurate forecast)
+# so, along the x-axis are the values of k from 1 to 10, along the y - the values of the model accuracy obtained for given k
+plot(k, accuracy, type = 'b')
+# optimal k = 9, accuracy - 37.5%.
+
+
+
+
+###MICROSOFT
+
+stocks<-inner_join(aapl.us[,c(1,5)], amzn.us[,c(1,5)], by = 'Date')
+stocks<-inner_join(stocks, msft.us[,c(1,5)], by = 'Date')
+stocks<-inner_join(stocks, fb.us[,c(1,5)], by = 'Date')
+stocks<-inner_join(stocks, googl.us[,c(1,5)], by = 'Date')
+colnames(stocks)<-c("Date", "Apple", "Amazon", "Microsoft", "Facebook", "Google")
+stocks$lagged<-lag(stocks$Microsoft)
+stocks$Increase<-ifelse(stocks$Microsoft > stocks$lagged, "TRUE", "FALSE")
+stocks[1,8]<-"TRUE"
+
+
+# Microsoft price chart
+plot(stocks$Microsoft, type = "l")
+plot(diff(stocks$Microsoft), type = "l")
+# Microsoft price chart
+
+# split into train and test samples
+stocks_Microsoft <- apply(stocks[, 2:6], 2, diff)
+stocks_Microsoft <- cbind(stocks_Microsoft, stocks[2:1381,c(1,8)])
+stocksTrain <- as.Date(stocks_Microsoft$Date, "%Y-%m-%d") < '2017-11-01'
+# split into train and test samples
+
+#model
+# build the model using knn method, set k equal to 1
+predictors <- cbind(lag(stocks_Microsoft$Apple, default = 3.958), 
+                    lag(stocks_Microsoft$Amazon, default = 4.26), 
+                    lag(stocks_Microsoft$Microsoft, default = 0.416), 
+                    lag(stocks_Microsoft$Facebook, default = -4.20), 
+                    lag(stocks_Microsoft$Google, default = 6.86))
+
+prediction <- knn(predictors[stocksTrain, ], 
+                  predictors[!stocksTrain, ], stocks_Microsoft$Increase[stocksTrain], k = 1)
+# precision n # model
+
+# model quality
+# display the results and compare the predicted values with the real ones
+# TP = 3 -> the model correctly predicted the next day's rise in stock prices in 3 cases
+# TN = 1 -> the model correctly predicted a fall in stock prices the next day in 1 case
+# FP = 3 -> the model interpreted the fall in 3 cases as growth
+# FN = 1 -> the model perceived in 1 case the growth as a drop in the diagnosis at k = 1 is 50%
+table(prediction, stocks_Microsoft$Increase[!stocksTrain])
+# prediction accuracy for k = 1 is 50%
+mean(prediction == stocks_Microsoft$Increase[!stocksTrain])
+# model quality
+
+# optimal k
+accuracy <- rep(0, 10)
+k <- 1:10
+for(x in 1:10){
+  prediction <- knn(predictors[stocksTrain, ], predictors[!stocksTrain, ],
+                    stocks_Microsoft$Increase[stocksTrain], k = x)
+  accuracy[x] <- mean(prediction == stocks_Microsoft$Increase[!stocksTrain])
+}
+# build a graph to determine the optimal k to obtain the highest accuracy
+# (i.e. for a more accurate forecast)
+# so, along the x-axis are the values of k from 1 to 10, along the y - the values of the model accuracy obtained for given k
+plot(k, accuracy, type = 'b')
+# optimal k = 1, accuracy - 50%.
+
+
+
+
+
+#####FACEBOOK
+
+stocks<-inner_join(aapl.us[,c(1,5)], amzn.us[,c(1,5)], by = 'Date')
+stocks<-inner_join(stocks, msft.us[,c(1,5)], by = 'Date')
+stocks<-inner_join(stocks, fb.us[,c(1,5)], by = 'Date')
+stocks<-inner_join(stocks, googl.us[,c(1,5)], by = 'Date')
+colnames(stocks)<-c("Date", "Apple", "Amazon", "Microsoft", "Facebook", "Google")
+stocks$lagged<-lag(stocks$Facebook)
+stocks$Increase<-ifelse(stocks$Facebook > stocks$lagged, "TRUE", "FALSE")
+stocks[1,8]<-"TRUE"
+
+
+# Facebook price chart
+plot(stocks$Facebook, type = "l")
+plot(diff(stocks$Facebook), type = "l")
+# Facebook price chart
+
+# split into train and test samples
+stocks_Facebook <- apply(stocks[, 2:6], 2, diff)
+stocks_Facebook <- cbind(stocks_Facebook, stocks[2:1381,c(1,8)])
+stocksTrain <- as.Date(stocks_Facebook$Date, "%Y-%m-%d") < '2017-11-01'
+# split into train and test samples
+
+#model
+# build the model using knn method, set k equal to 1
+predictors <- cbind(lag(stocks_Facebook$Apple, default = 3.958), 
+                    lag(stocks_Facebook$Amazon, default = 4.26), 
+                    lag(stocks_Facebook$Microsoft, default = 0.416), 
+                    lag(stocks_Facebook$Facebook, default = -4.20), 
+                    lag(stocks_Facebook$Google, default = 6.86))
+
+prediction <- knn(predictors[stocksTrain, ], 
+                  predictors[!stocksTrain, ], stocks_Facebook$Increase[stocksTrain], k = 1)
+#model
+
+# model quality
+# display the results and compare the predicted values with the real ones
+# TP = 2 -> the model correctly predicted the rise in stock prices the next day in 2 cases
+# TN = 3 -> the model correctly predicted a fall in stock prices the next day in 3 cases
+# FP = 2 -> the model interpreted the fall in 2 cases as growth
+# FN = 1 -> the model perceived in 1 case the growth as a fall
+table(prediction, stocks_Facebook$Increase[!stocksTrain])
+# prediction accuracy for k = 1 is 62.5%
+mean(prediction == stocks_Facebook$Increase[!stocksTrain])
+# model quality
+
+## optimal k
+accuracy <- rep(0, 10)
+k <- 1:10
+for(x in 1:10){
+  prediction <- knn(predictors[stocksTrain, ], predictors[!stocksTrain, ],
+                    stocks_Facebook$Increase[stocksTrain], k = x)
+  accuracy[x] <- mean(prediction == stocks_Facebook$Increase[!stocksTrain])
+}
+
+# build a graph to determine the optimal k to obtain the highest accuracy
+# (i.e. for a more accurate forecast)
+# so, along the x-axis are the values of k from 1 to 10, along the y - the values of the model accuracy obtained for given k
+plot(k, accuracy, type = 'b')
+# optimal k = 7, accuracy - 87.5%.
+
+
+
+
+
+
+####GOOGLE
+
+stocks<-inner_join(aapl.us[,c(1,5)], amzn.us[,c(1,5)], by = 'Date')
+stocks<-inner_join(stocks, msft.us[,c(1,5)], by = 'Date')
+stocks<-inner_join(stocks, fb.us[,c(1,5)], by = 'Date')
+stocks<-inner_join(stocks, googl.us[,c(1,5)], by = 'Date')
+colnames(stocks)<-c("Date", "Apple", "Amazon", "Microsoft", "Facebook", "Google")
+stocks$lagged<-lag(stocks$Google)
+stocks$Increase<-ifelse(stocks$Google > stocks$lagged, "TRUE", "FALSE")
+stocks[1,8]<-"TRUE"
+
+
+# google price chart
+plot(stocks$Google, type = "l")
+plot(diff(stocks$Google), type = "l")
+# google price chart
+
+# split into train and test samples
+stocks_Google <- apply(stocks[, 2:6], 2, diff)
+stocks_Google <- cbind(stocks_Google, stocks[2:1381,c(1,8)])
+stocksTrain <- as.Date(stocks_Google$Date, "%Y-%m-%d") < '2017-11-01'
+# split into train and test samples
+
+#model
+# build the model using knn method, set k equal to 1
+predictors <- cbind(lag(stocks_Google$Apple, default = 3.958), 
+                    lag(stocks_Google$Amazon, default = 4.26), 
+                    lag(stocks_Google$Microsoft, default = 0.416), 
+                    lag(stocks_Google$Facebook, default = -4.20), 
+                    lag(stocks_Google$Google, default = 6.86))
+
+prediction <- knn(predictors[stocksTrain, ], 
+                  predictors[!stocksTrain, ], stocks_Google$Increase[stocksTrain], k = 1)
+#model
+
+# model quality
+# display the results and compare the predicted values with the real ones
+# TP = 2 -> the model correctly predicted the rise in stock prices the next day in 2 cases
+# TN = 1 -> the model correctly predicted a fall in stock prices the next day in 1 case
+# FP = 2 -> the model interpreted the fall in 2 cases as growth
+# FN = 3 -> the model interpreted the growth in 3 cases as a fall
+table(prediction, stocks_Google$Increase[!stocksTrain])
+# the forecast accuracy for k = 1 is 37.5%
+mean(prediction == stocks_Google$Increase[!stocksTrain])
+# model quality
+
+# optimal k
+accuracy <- rep(0, 10)
+k <- 1:10
+for(x in 1:10){
+  prediction <- knn(predictors[stocksTrain, ], predictors[!stocksTrain, ],
+                    stocks_Google$Increase[stocksTrain], k = x)
+  accuracy[x] <- mean(prediction == stocks_Google$Increase[!stocksTrain])
+}
+
+# build a graph to determine the optimal k to obtain the highest accuracy
+# (i.e. for a more accurate forecast)
+# so, along the x-axis are the values of k from 1 to 10, along the y - the values of the model accuracy obtained for given k
+plot(k, accuracy, type = 'b')
+
+```
+
