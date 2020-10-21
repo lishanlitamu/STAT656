@@ -380,9 +380,12 @@ tsla_news <- tsla_news[, 4:5] # Extract relevant columns only
 tsla_news$webPublicationDate <- base::as.Date(base::substr(tsla_news$webPublicationDate, 1, 10), 
                                               "%Y-%m-%d")
 
-
-goog_news <- GuardianR::get_guardian("Google", from.date = "2014-03-27", 
+## Query Guardian for GOOG news
+goog_news_1 <- GuardianR::get_guardian("Google", from.date = "2014-03-27", 
+                                       to.date = "2017-08-31", api.key = api_key)
+goog_news_2 <- GuardianR::get_guardian("Google", from.date = "2017-09-01", 
                                      to.date = "2020-09-01", api.key = api_key)
+goog_news <- dplyr::bind_rows(goog_news)
 goog_news <- goog_news[, 4:5] # Extract relevant columns only
 
 ## Format date column
@@ -398,21 +401,40 @@ negative_words <- base::data.frame(
   readxl::read_excel("2 - Word Lists/LoughranMcDonald_SentimentWordLists_2018.xlsx",
                      sheet = "Negative", col_names = F))$...1
 
+## Calculate sentiment for TSLA
 tsla_news$Sentiment <- NA
 for (row in 1:base::nrow(tsla_news)) {
   tmp <- base::strsplit(tsla_news[row, ]$webTitle, "[[:space:]]|(?=[.!?])", perl = T)[[1]]
   
   sentiment <- 0
-  if (base::nchar(word) > 1) {
-      for (word in tmp) {
-        if (base::any(stringr::str_detect(positive_words, stringr::regex(word, ignore_case = T)))) {
-          sentiment <- sentiment + 1
-        } else if (base::any(stringr::str_detect(negative_words, stringr::regex(word, ignore_case = T)))) {
-          sentiment <- sentiment - 1
-        }
+  for (word in tmp) {
+    if (base::nchar(word) > 1 & !(base::grepl("\\(", word)) & !(base::grepl("\\)", word))) {
+      if (base::any(stringr::str_detect(positive_words, stringr::regex(word, ignore_case = T)))) {
+        sentiment <- sentiment + 1
+      } else if (base::any(stringr::str_detect(negative_words, stringr::regex(word, ignore_case = T)))) {
+        sentiment <- sentiment - 1
       }
-  tsla_news[row, ]$Sentiment <- sentiment
+    }
   }
+  tsla_news[row, ]$Sentiment <- sentiment
+}
+
+## Calculate sentiment for GOOG
+goog_news$Sentiment <- NA
+for (row in 1:base::nrow(goog_news)) {
+  tmp <- base::strsplit(goog_news[row, ]$webTitle, "[[:space:]]|(?=[.!?])", perl = T)[[1]]
+  
+  sentiment <- 0
+  for (word in tmp) {
+    if (base::nchar(word) > 1 & !(base::grepl("\\(", word)) & !(base::grepl("\\)", word))) {
+      if (base::any(stringr::str_detect(positive_words, stringr::regex(word, ignore_case = T)))) {
+        sentiment <- sentiment + 1
+      } else if (base::any(stringr::str_detect(negative_words, stringr::regex(word, ignore_case = T)))) {
+        sentiment <- sentiment - 1
+      }
+    }
+  }
+  goog_news[row, ]$Sentiment <- sentiment
 }
 ```
 
