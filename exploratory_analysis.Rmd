@@ -384,8 +384,8 @@ tsla_news$webPublicationDate <- base::as.Date(base::substr(tsla_news$webPublicat
 goog_news_1 <- GuardianR::get_guardian("Google", from.date = "2014-03-27", 
                                        to.date = "2017-08-31", api.key = api_key)
 goog_news_2 <- GuardianR::get_guardian("Google", from.date = "2017-09-01", 
-                                     to.date = "2020-09-01", api.key = api_key)
-goog_news <- dplyr::bind_rows(goog_news)
+                                       to.date = "2020-09-01", api.key = api_key)
+goog_news <- dplyr::bind_rows(goog_news_1, goog_news_2)
 goog_news <- goog_news[, 4:5] # Extract relevant columns only
 
 ## Format date column
