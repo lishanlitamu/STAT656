@@ -372,8 +372,9 @@ corrplot::corrplot(corrGoog, order="hclust")
 api_key <- "d02efa1b-b4a4-4e20-a7f5-eee62d80cbf6"
 
 ## Query Guardian for TSLA news
-tsla_news <- GuardianR::get_guardian("Tesla", from.date = "2010-09-01", 
-                                     to.date = "2020-09-01", api.key = api_key)
+tsla_news <- GuardianR::get_guardian("Tesla", section = base::c("business", "technology", 
+                                                                   "money", "world"), 
+                                     from.date = "2015-10-02", to.date = "2020-09-01", api.key = api_key)
 tsla_news <- tsla_news[, 4:5] # Extract relevant columns only
 
 ## Format date column
@@ -381,11 +382,9 @@ tsla_news$webPublicationDate <- base::as.Date(base::substr(tsla_news$webPublicat
                                               "%Y-%m-%d")
 
 ## Query Guardian for GOOG news
-goog_news_1 <- GuardianR::get_guardian("Google", from.date = "2014-03-27", 
-                                       to.date = "2017-08-31", api.key = api_key)
-goog_news_2 <- GuardianR::get_guardian("Google", from.date = "2017-09-01", 
-                                       to.date = "2020-09-01", api.key = api_key)
-goog_news <- dplyr::bind_rows(goog_news_1, goog_news_2)
+goog_news <- GuardianR::get_guardian("Alphabet", section = base::c("business", "technology", 
+                                                                   "money", "world"), 
+                                     from.date = "2015-10-02", to.date = "2020-09-01", api.key = api_key)
 goog_news <- goog_news[, 4:5] # Extract relevant columns only
 
 ## Format date column
