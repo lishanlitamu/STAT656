@@ -33,6 +33,9 @@ library(TTR)      #Calculate Indicators: EMA,SMA,RSI
 library(leaps)    #Stepwise Model Selection
 library(zoo)      # Interpolation
 library(elasticnet) #ridge, lasso, elastic net regression
+library(earth)    #MARS, multivariate adaptive regression splines
+library(vip)      #Variable importance, lecture 27
+library(glmnet)   #Elastic net regression
 #library(keras)    #Neural Networks
 #library(tensorflow)
 
@@ -1076,12 +1079,13 @@ tlsaLinearRegFull = tslaFull %>%
 
 ```
 
-The selected logistic model has very low R-squared but all coefficients 
+
 
 ```{r dataSplit}
-set.seed(1989)
+set.seed(2020)
 YtslaNN = YtslaPenalty %>% mutate(YtslaDummy)
 trainIndex = caret::createDataPartition(YtslaNN$diffHighLowTomorrow, p = 0.25, list = FALSE)
+
 YtslaTrain_DiffHighLow      = YtslaNN$diffHighLowTomorrow[trainIndex]
 YtslaTrain_StockReturn      = YtslaNN$stockReturnTomorrow[trainIndex]
 YtslaTrain_StockReturnDummy = YtslaNN$stockReturnTomorrowDummy[trainIndex]
@@ -1093,16 +1097,322 @@ YtslaTest_StockReturnDummy  = YtslaNN$stockReturnTomorrowDummy [-trainIndex]
 XtslaNN = tslaLogReg %>%
 select(-c(aboveR1.Yes,aboveR2.Yes,aboveR3.Yes,belowS1.Yes,belowS2.Yes,belowS3.Yes,diffHighLowTomorrow,stockReturnTomorrow,stockReturnTomorrowDummy))
 
+#Standardize all 41 quantitative features.
 XtslaNNScaledFit = caret::preProcess(XtslaNN,method = c("center","scale")) 
-XtslaNNScaled    = predict(XtslaNNScaledFit,XtslaNN)
+XtslaNNScaled    = predict(XtslaNNScaledFit,XtslaNN) 
 
-XtslaTrain = XtslaNNScaled[trainIndex,]
-XtslaTest  = XtslaNNScaled[-trainIndex,]
+#Add dummy variables back to the feature matrix.
+XtslaNNFull      = XtslaNNScaled %>% mutate(tslaLogReg %>% select(c(aboveR1.Yes,aboveR2.Yes,aboveR3.Yes,belowS1.Yes,belowS2.Yes,belowS3.Yes))) 
+
+#XtslaTrain = XtslaNNScaled[trainIndex,] #After standardization, selected as training data
+#XtslaTest  = XtslaNNScaled[-trainIndex,]#After standardization, selected as test data
+
+XtslaTrain = XtslaNNFull[trainIndex,] #After standardization, selected as training data
+XtslaTest  = XtslaNNFull[-trainIndex,]#After standardization, selected as test data
+
 ```
 
-```{r logisticRegressionAfterDataSplit}
-#Select tuning parameters with validation set
-#Fit logistic models with training set
+```{r MARS}
+#Lecture 27
+tuneGridTsla = expand.grid(degree = 1:3,
+                           nprune = c(10, 15, 20, 25, 30, 40, 50))
+
+set.seed(2020)
+number = 5 
+
+#cross validated model
+
+#-1-# Supervisor = StockReturn
+marsTuneTslaSR = caret::train(
+  x = XtslaTrain,
+  y = YtslaTrain_StockReturn,
+  method = "earth",
+  metric = "RMSE",
+  trControl = trainControl(method = "cv", number = number),
+  tuneGrid = tuneGridTsla
+)
+marsTuneTslaSR$bestTune
+min(marsTuneTslaSR$results$RMSE)
+max(marsTuneTslaSR$results$Rsquared)
+
+#library(digest) #Fixed error: Error: package ‘digest’ does not have a namespace
+ggplot2::ggplot(marsTuneTslaSR)
+
+#Multiple Linear Regression
+mlrCVTslaSR = train(
+  x = XtslaTrain,
+  y = YtslaTrain_StockReturn,
+  method = "lm",
+  metric = "RMSE",
+  trControl = trainControl(method = "cv", number = number)
+  #We've standardize our data. 
+)
+
+mlrCVTslaSR$results$RMSE
+mlrCVTslaSR$results$Rsquared
+
+#Elastic Net
+glmnetCVTslaSR = train(
+  x = XtslaTrain,
+  y = YtslaTrain_StockReturn,
+  method = "glmnet",
+  trControl = trainControl(method = "cv", number = number),
+  metric = "RMSE",
+  preProcess = "zv",
+  tuneLength = 20
+)
+
+min(glmnetCVTslaSR$results$RMSE)
+max(glmnetCVTslaSR$results$Rsquared, na.rm = TRUE)
+
+
+
+
+#-2-#Supervisor = diffHighLow
+marsTuneTslaHL = caret::train(
+  x = XtslaTrain,
+  y = YtslaTrain_DiffHighLow,
+  method = "earth",
+  metric = "RMSE",
+  trControl = trainControl(method = "cv", number = number),
+  tuneGrid = tuneGridTsla
+)
+
+marsTuneTslaHL$bestTune
+min(marsTuneTslaHL$results$RMSE)
+max(glmnetCVTslaHL$results$Rsquared, na.rm = TRUE)
+
+ggplot2::ggplot(marsTuneTslaHL)
+
+mlrCVTslaHL = train(
+  x = XtslaTrain,
+  y = YtslaTrain_DiffHighLow,
+  method = "lm",
+  metric = "RMSE",
+  trControl = trainControl(method = "cv", number = number)
+  #We've standardize our data. 
+)
+
+mlrCVTslaHL$results$RMSE
+mlrCVTslaHL$results$Rsquared
+
+glmnetCVTslaHL = train(
+  x = XtslaTrain,
+  y = YtslaTrain_DiffHighLow,
+  method = "glmnet",
+  trControl = trainControl(method = "cv", number = number),
+  metric = "RMSE",
+  preProcess = "zv",
+  tuneLength = 20
+)
+
+min(glmnetCVTslaHL$results$RMSE)
+max(glmnetCVTslaHL$results$Rsquared, na.rm = TRUE)
+
+
+#Variable Importance
+##Supervisor = StockReturn
+marsVipTslaSR = vip::vip(marsTuneTslaSR, num_features = 41,  bar = NULL,geom = "point", value = "gcv")+ ggplot2::ggtitle("GCV - TSLA (47 Features)")
+plot(marsVipTslaSR)
+##Supervisor = diffHighLoW
+marsVipTslaHL = vip::vip(marsTuneTslaHL, num_features = 41,  bar = NULL,geom = "point", value = "gcv")+ ggplot2::ggtitle("GCV - TSLA (47 Features)")
+plot(marsVipTslaHL)
+```
+
+```{r removeCorrMARS}
+### Compare results after removing highly correlated features. 
+
+#Remove highly correlated features
+highCorrTsla = highCorrF(XtslaNNFull,0.8)
+highCorrTsla
+
+XtslaNNFullRemoveCorr = XtslaNNFull %>% select(-highCorrTsla)
+XtslaTrainRemoveCorr = XtslaNNFullRemoveCorr[trainIndex,]
+XtslaTestRemoveCorr  = XtslaNNFullRemoveCorr[-trainIndex,]
+
+#Repeat all steps 
+tuneGridTsla = expand.grid(degree = 1:3,
+                           nprune = c(10, 15, 20, 25, 30, 40, 50))
+
+set.seed(2020)
+number = 5 
+
+#cross validated model
+
+#-1-# Supervisor = StockReturn
+#MARS#
+marsTuneTslaRemoveCorrSR = caret::train(
+  x = XtslaTrainRemoveCorr,
+  y = YtslaTrain_StockReturn,
+  method = "earth",
+  metric = "RMSE",
+  trControl = trainControl(method = "cv", number = number),
+  tuneGrid = tuneGridTsla
+)
+marsTuneTslaRemoveCorrSR$bestTune
+#library(digest) #Fixed error: Error: package ‘digest’ does not have a namespace
+ggplot2::ggplot(marsTuneTslaRemoveCorrSR)
+
+min(marsTuneTslaRemoveCorrSR$results$RMSE)
+max(marsTuneTslaRemoveCorrSR$results$Rsquared)
+
+#Multiple Linear Regression#
+mlrCVTslaRemoveCorrSR = train(
+  x = XtslaTrainRemoveCorr,
+  y = YtslaTrain_StockReturn,
+  method = "lm",
+  metric = "RMSE",
+  trControl = trainControl(method = "cv", number = number)
+  #We've standardize our data. 
+)
+
+mlrCVTslaRemoveCorrSR$results$RMSE
+mlrCVTslaRemoveCorrSR$results$Rsquared
+
+#Elastic Net#
+glmnetCVTslaRemoveCorrSR = train(
+  x = XtslaTrainRemoveCorr,
+  y = YtslaTrain_StockReturn,
+  method = "glmnet",
+  trControl = trainControl(method = "cv", number = number),
+  metric = "RMSE",
+  preProcess = "zv",
+  tuneLength = 20
+)
+
+min(glmnetCVTslaRemoveCorrSR$results$RMSE)
+max(glmnetCVTslaRemoveCorrSR$results$Rsquared, na.rm = TRUE)
+
+
+
+
+#-2-#Supervisor = diffHighLow
+marsTuneTslaRemoveCorrHL = caret::train(
+  x = XtslaTrainRemoveCorr,
+  y = YtslaTrain_DiffHighLow,
+  method = "earth",
+  metric = "RMSE",
+  trControl = trainControl(method = "cv", number = number),
+  tuneGrid = tuneGridTsla
+)
+
+marsTuneTslaRemoveCorrHL$bestTune
+ggplot2::ggplot(marsTuneTslaRemoveCorrHL)
+
+min(marsTuneTslaRemoveCorrHL$results$RMSE)
+max(marsTuneTslaRemoveCorrHL$results$Rsquared, na.rm = TRUE)
+
+
+
+mlrCVTslaRemoveCorrHL = train(
+  x = XtslaTrainRemoveCorr,
+  y = YtslaTrain_DiffHighLow,
+  method = "lm",
+  metric = "RMSE",
+  trControl = trainControl(method = "cv", number = number)
+  #We've standardize our data. 
+)
+
+mlrCVTslaRemoveCorrHL$results$RMSE
+mlrCVTslaRemoveCorrHL$results$Rsquared
+
+glmnetCVTslaRemoveCorrHL = train(
+  x = XtslaTrainRemoveCorr,
+  y = YtslaTrain_DiffHighLow,
+  method = "glmnet",
+  trControl = trainControl(method = "cv", number = number),
+  metric = "RMSE",
+  preProcess = "zv",
+  tuneLength = 20
+)
+
+min(glmnetCVTslaRemoveCorrHL$results$RMSE)
+max(glmnetCVTslaRemoveCorrHL$results$Rsquared, na.rm = TRUE)
+
+
+#Variable Importance
+##Supervisor = StockReturn
+marsVipTslaRemoveCorrSR = vip::vip(marsTuneTslaRemoveCorrSR, num_features = 24,  bar = NULL,geom = "point", value = "gcv")+ ggplot2::ggtitle("GCV - TSLA (24 Features)")
+plot(marsVipTslaRemoveCorrSR)
+##Supervisor = diffHighLoW
+marsVipTslaRemoveCorrHL = vip::vip(marsTuneTslaRemoveCorrHL, num_features = 24,  bar = NULL,geom = "point", value = "gcv")+ ggplot2::ggtitle("GCV - TSLA (24 Features)")
+plot(marsVipTslaRemoveCorrHL)
+```
+
+``` {r summary(MARS vs MLR vs ElasticNet}
+#Overall Comparisons of results from previous section
+
+namesRMSE = c("RMSE_MARS_tslaStockReturn",
+              "RMSE_MLR_tslaStockReturn",
+              "RMSE_GLMNET_tslaStockReturn",
+              "RMSE_MARS_tslaStockReturn_RemoveCorr",
+              "RMSE_MLR_tslaStockReturn_RemoveCorr",
+              "RMSE_GLMNET_tslaStockReturn_RemoveCorr",
+              "RMSE_MARS_tslaDiffHighLow",
+              "RMSE_MLR_tslaDiffHighLow",
+              "RMSE_GLMNET_tslaDiffHighLow",
+              "RMSE_MARS_tslaDiffHighLow_RemoveCorr",
+              "RMSE_MLR_tslaDiffHighLow_RemoveCorr",
+              "RMSE_GLMNET_tslaDiffHighLow_RemoveCorr")
+
+summaryRMSE = c(min(marsTuneTslaSR$results$RMSE),
+                mlrCVTslaSR$results$RMSE,
+                min(glmnetCVTslaSR$results$RMSE),
+                min(marsTuneTslaRemoveCorrSR$results$RMSE), 
+                mlrCVTslaRemoveCorrSR$results$RMSE,
+                min(glmnetCVTslaRemoveCorrSR$results$RMSE),
+                min(marsTuneTslaHL$results$RMSE),
+                mlrCVTslaHL$results$RMSE,
+                min(glmnetCVTslaHL$results$RMSE),
+                min(marsTuneTslaRemoveCorrHL$results$RMSE),
+                mlrCVTslaRemoveCorrHL$results$RMSE,
+                min(glmnetCVTslaRemoveCorrHL$results$RMSE))
+
+sumRMSE = cbind(namesRMSE,round(summaryRMSE,digits = 5))
+
+
+knitr::kable(
+ sumRMSE,
+ col.names = c("Metric","Values"),
+ caption   = "Table of RMSE, Tsla ",
+ align     = "lccrr"
+)
+
+
+namesRsquared = c("Rsquared_MARS_tslaStockReturn",
+              "Rsquared_MLR_tslaStockReturn",
+              "Rsquared_GLMNET_tslaStockReturn",
+              "Rsquared_MARS_tslaStockReturn_RemoveCorr",
+              "Rsquared_MLR_tslaStockReturn_RemoveCorr",
+              "Rsquared_GLMNET_tslaStockReturn_RemoveCorr",
+              "Rsquared_MARS_tslaDiffHighLow",
+              "Rsquared_MLR_tslaDiffHighLow",
+              "Rsquared_GLMNET_tslaDiffHighLow",
+              "Rsquared_MARS_tslaDiffHighLow_RemoveCorr",
+              "Rsquared_MLR_tslaDiffHighLow_RemoveCorr",
+              "Rsquared_GLMNET_tslaDiffHighLow_RemoveCorr")
+summaryRsquared = c(max(marsTuneTslaSR$results$Rsquared),
+                mlrCVTslaSR$results$Rsquared,
+                max(glmnetCVTslaSR$results$Rsquared, na.rm = TRUE),
+                max(marsTuneTslaRemoveCorrSR$results$Rsquared), 
+                mlrCVTslaRemoveCorrSR$results$Rsquared,
+                max(glmnetCVTslaRemoveCorrSR$results$Rsquared, na.rm = TRUE),
+                max(marsTuneTslaHL$results$Rsquared),
+                mlrCVTslaHL$results$Rsquared,
+                max(glmnetCVTslaHL$results$Rsquared, na.rm = TRUE),
+                max(marsTuneTslaRemoveCorrHL$results$Rsquared),
+                mlrCVTslaRemoveCorrHL$results$Rsquared,
+                max(glmnetCVTslaRemoveCorrHL$results$Rsquared, na.rm = TRUE))
+
+
+sumRsquared = cbind(namesRsquared, round(summaryRsquared,digits = 5))
+
+knitr::kable(
+ sumRsquared,
+ col.names = c("Metric","Values"),
+ caption   = "Table of Rsquared, Tsla ",
+ align     = "lccrr"
+)
 ```
 
 ```{r modelPerformance}
