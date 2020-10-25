@@ -734,6 +734,53 @@ names(beforeAfterVar)
 
 ```
 
+```{r }
+
+tslaAddVolYesterday = addLaggedVarF(tslaAddCCI$PX_VOLUME,tslaAddCCI, "diffVolume", 1)
+
+tslaAddVolTemp = tslaAddVolYesterday %>%
+  mutate(diffVolume = PX_VOLUME - diffVolume1) %>%
+  dplyr::slice(-1) %>%
+  mutate(increasedVolume = rep(0.01, nrow(.)))
+
+for (i in 1:nrow(tslaAddVolTemp)) {
+  if (tslaAddVolTemp$diffVolume[i] <=0 ) {
+    tslaAddVolTemp$increasedVolume[i] = 0
+} else {
+  tslaAddVolTemp$increasedVolume[i] = tslaAddVolTemp$diffVolume[i] 
+}
+}
+
+ 
+addLaggedVarF = function(feature, dataForModification, featureName,lagSize ) {
+  for (lags in 1:lagSize) { 
+    newColName = paste0(featureName, lags)
+    dataForModification = dataForModification %>%
+      dplyr::mutate(!!sym(newColName) := dplyr::lag(feature, n = lags))
+  }
+  return(dataForModification)
+}
+
+varPastVolumesF = function(featureVolume,lagsize) {
+  pastVol_upper = rep(0.0123, length(featureVolume))
+  for (d in 1:(length(featureVolume) - lagsize + 1)) {
+    pastVol = featureVolume[d:(d + lagsize - 1)]
+    pastVol_upper[d+lagsize] = mean(pastVol) + 1.96*var(pastVol)**.5
+  }
+  return(pastVol_upper)
+}
+
+pastVol_upper = varPastVolumesF(tslaAddVolTemp$PX_VOLUME,5) #2373
+
+pastVol_upper[1:20]
+
+tslaAddVolTemp_ = tslaAddVolTemp %>%
+  dplyr::slice(-1) %>%
+  mutate(pastVol_upper) 
+
+
+```
+
 Up till now, we added xx stock indicators:
 `r names(beforeAfterVar)`
 
@@ -749,6 +796,8 @@ addLaggedVarF = function(feature, dataForModification, featureName,lagSize ) {
   }
   return(dataForModification)
 }
+
+
 
 #Create lagged features for model fitting (use as an alternative to Time Series Model)
 #List all predictors and decide of which predictors we should calculate lagged values.
@@ -782,7 +831,7 @@ addDiffVarF = function(dataForModification,nColumn) {
 tslaAddDiff =  addDiffVarF(tslaSelected,ncol(tslaSelected))
 ``` 
 #A few added indicators represent moving average of price or volume in a past designated period. Hence, we probably don't need to include lagged values. 
-#### Probably delete above codes later #######################
+#### Probably delete above codes later ##################
 
 Up till now, we added xx stock indicators:
 `r names(beforeAfterVar)`
@@ -1138,6 +1187,12 @@ write.csv(XtslaNNFull,"D:/Mia/STAT/656/XtslaNNFull.csv",
 write.csv(XtslaNNFullRemoveCorr,"D:/Mia/STAT/656/XtslaNNFullRemoveCorr.csv", 
           row.names = FALSE)
 
+hclustPlotF(XtslaNNScaled)
+
+names(XtslaNNFull)
+
+names(XtslaNNFullRemoveCorr)
+names(high)
 ```
 
 ```{r MARS}
