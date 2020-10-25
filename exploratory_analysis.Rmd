@@ -1083,7 +1083,13 @@ tlsaLinearRegFull = tslaFull %>%
 
 ```{r dataSplit}
 set.seed(2020)
-YtslaNN = YtslaPenalty %>% mutate(YtslaDummy)
+
+#Standardize two of three supervisors.We don't need to standardize a dummy variable.
+YtslaNNScaledFit = caret::preProcess(YtslaPenalty,method = c("center","scale")) 
+YtslaNNScaled    = predict(YtslaNNScaledFit,YtslaPenalty) 
+
+YtslaNN = YtslaNNScaled %>% mutate(YtslaDummy)
+
 trainIndex = caret::createDataPartition(YtslaNN$diffHighLowTomorrow, p = 0.25, list = FALSE)
 
 YtslaTrain_DiffHighLow      = YtslaNN$diffHighLowTomorrow[trainIndex]
@@ -1109,6 +1115,28 @@ XtslaNNFull      = XtslaNNScaled %>% mutate(tslaLogReg %>% select(c(aboveR1.Yes,
 
 XtslaTrain = XtslaNNFull[trainIndex,] #After standardization, selected as training data
 XtslaTest  = XtslaNNFull[-trainIndex,]#After standardization, selected as test data
+```
+
+```{r createDataForNN_Python}
+#Supervisors and features are all standardized except the dummy variables. 
+tslaY1 = YtslaNN$stockReturnTomorrow 
+tslaY2 = YtslaNN$stockReturnTomorrowDummy
+tslaY3 = YtslaNN$diffHighLowTomorrow
+
+#Supervisors
+write.csv(tslaY1,"D:/Mia/STAT/656/tslaSR_Y1.csv", 
+          row.names = FALSE)
+write.csv(tslaY2,"D:/Mia/STAT/656/tslaSRdummy_Y2.csv", 
+          row.names = FALSE)
+write.csv(tslaY3,"D:/Mia/STAT/656/tslaHL_Y3.csv", 
+          row.names = FALSE)
+#Feature Matrix
+write.csv(XtslaNNFull,"D:/Mia/STAT/656/XtslaNNFull.csv", 
+          row.names = FALSE)
+
+#Feature Matrix without highly correlated features
+write.csv(XtslaNNFullRemoveCorr,"D:/Mia/STAT/656/XtslaNNFullRemoveCorr.csv", 
+          row.names = FALSE)
 
 ```
 
