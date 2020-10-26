@@ -734,57 +734,67 @@ names(beforeAfterVar)
 
 ```
 
-```{r }
+```{r additionMeasuresOnStockTrend}
+#Calculate stock price trend supported with significant volume increase
+tslaAddVolYesterday = addLaggedVarF(tslaAddCCI$PX_VOLUME,tslaAddCCI, "pastVolume", 1)
+tslaAddPx_lastYesterday = addLaggedVarF(tslaAddVolYesterday$PX_LAST,tslaAddVolYesterday, "pastLastPrice", 1)
 
-tslaAddVolYesterday = addLaggedVarF(tslaAddCCI$PX_VOLUME,tslaAddCCI, "diffVolume", 1)
-
-tslaAddVolTemp = tslaAddVolYesterday %>%
-  mutate(diffVolume = PX_VOLUME - diffVolume1) %>%
+tslaAddVolTemp1 = tslaAddPx_lastYesterday %>%
+  mutate(diffVolume = PX_VOLUME - pastVolume1) %>%
   dplyr::slice(-1) %>%
   mutate(increasedVolume = rep(0.01, nrow(.)))
 
-for (i in 1:nrow(tslaAddVolTemp)) {
-  if (tslaAddVolTemp$diffVolume[i] <=0 ) {
-    tslaAddVolTemp$increasedVolume[i] = 0
-} else {
-  tslaAddVolTemp$increasedVolume[i] = tslaAddVolTemp$diffVolume[i] 
-}
+for (i in 1:nrow(tslaAddVolTemp1)) {
+  if (tslaAddVolTemp1$diffVolume[i] <=0 ) {
+    tslaAddVolTemp1$increasedVolume[i] = 0
+  } else {
+    tslaAddVolTemp1$increasedVolume[i] = 1*tslaAddVolTemp1$diffVolume[i] 
+  }
 }
 
- 
-addLaggedVarF = function(feature, dataForModification, featureName,lagSize ) {
-  for (lags in 1:lagSize) { 
-    newColName = paste0(featureName, lags)
-    dataForModification = dataForModification %>%
-      dplyr::mutate(!!sym(newColName) := dplyr::lag(feature, n = lags))
-  }
-  return(dataForModification)
-}
 
 varPastVolumesF = function(featureVolume,lagsize) {
   pastVol_upper = rep(0.0123, length(featureVolume))
   for (d in 1:(length(featureVolume) - lagsize + 1)) {
     pastVol = featureVolume[d:(d + lagsize - 1)]
-    pastVol_upper[d+lagsize] = mean(pastVol) + 1.96*var(pastVol)**.5
+    pastVol_upper[d+lagsize - 1] = mean(pastVol) + 1.28*var(pastVol)**.5 
+    #80% confidence
   }
   return(pastVol_upper)
 }
 
-pastVol_upper = varPastVolumesF(tslaAddVolTemp$PX_VOLUME,5) #2373
+pastVol_upper = varPastVolumesF(tslaAddVolTemp$PX_VOLUME,5) 
+#pastVol_upper[1:20]
 
-pastVol_upper[1:20]
+tslaAddVolTemp2 = tslaAddVolTemp1 %>%
+  mutate(pastVol_upper) %>%
+  mutate(afterHourDiffPriceRatio = (PX_OPEN - pastLastPrice1)/pastLastPrice1) %>% 
+  #afterHourDiffPrice = closePrice_yesterday - openPrice_today
+  mutate(largerThanUpperVol = rep(0.0123, nrow(.)))
 
-tslaAddVolTemp_ = tslaAddVolTemp %>%
-  dplyr::slice(-1) %>%
-  mutate(pastVol_upper) 
+#Valid volume increase (when the current volume is larger than the upper bound of volumes in past five days including the current date.)
 
+for (i in 1:nrow(tslaAddVolTemp2)) {
+  if (tslaAddVolTemp2$PX_VOLUME[i] < tslaAddVolTemp2$pastVol_upper[i]) {
+    tslaAddVolTemp2$largerThanUpperVol[i] = 0
+  } else {
+    tslaAddVolTemp2$largerThanUpperVol[i] = 1*tslaAddVolTemp2$diffVolume[i] 
+  }
+}
+
+names(tslaAddVolTemp3)
+#Add interaction terms
+tslaAddVolTemp3 = tslaAddVolTemp2 %>% 
+  mutate(increaseTrend = diffLastOpen * increasedVolume) %>%
+  mutate(strongIncreaseTrend = diffLastOpen * largerThanUpperVol) %>%
+  select(- c(pastVolume1,pastLastPrice1,diffVolume,increasedVolume,pastVol_upper,largerThanUpperVol))
 
 ```
 
 Up till now, we added xx stock indicators:
 `r names(beforeAfterVar)`
 
-#### Probably delete below codes later ##################
+
 ```{r addLaggedVariables}
 #Add lagged values of features. We'll fit time series models later. This can be a fairly good alternative for TS models, which saves us from running the stationarity test for each feature. 
 
