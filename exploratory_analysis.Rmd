@@ -784,10 +784,11 @@ for (i in 1:nrow(tslaAddVolTemp2)) {
 
 names(tslaAddVolTemp3)
 #Add interaction terms
-tslaAddVolTemp3 = tslaAddVolTemp2 %>% 
+tslaAddVolTrend = tslaAddVolTemp2 %>% 
   mutate(increaseTrend = diffLastOpen * increasedVolume) %>%
   mutate(strongIncreaseTrend = diffLastOpen * largerThanUpperVol) %>%
   select(- c(pastVolume1,pastLastPrice1,diffVolume,increasedVolume,pastVol_upper,largerThanUpperVol))
+
 
 ```
 
@@ -808,19 +809,6 @@ addLaggedVarF = function(feature, dataForModification, featureName,lagSize ) {
 }
 
 
-
-#Create lagged features for model fitting (use as an alternative to Time Series Model)
-#List all predictors and decide of which predictors we should calculate lagged values.
-names(tslaAddCCI)
-
-lags10Days = 10
-lags21Days = 21
-tslaLagged = addLaggedVarF(tslaAddCCI$PX_HIGH, tslalaggedAddRSI, "PX_HIGH",lags10Days)
-for (j in 2:ncol(tslalaggedAddRSI)) {
-  tslaLagged = addLaggedVarF(tslalaggedAddRSI[,j], tslaLagged, names(tslalaggedAddRSI)[j],lags10Days)
-}
-
-
 addDiffVarF = function(dataForModification,nColumn) {
   #"tslaSelected" is created to remove features with too many missing values from the original data
   #Purpose: Take the first difference of features in "tslaSelected"
@@ -838,7 +826,7 @@ addDiffVarF = function(dataForModification,nColumn) {
  return(laggedDiff)
 }
 
-tslaAddDiff =  addDiffVarF(tslaSelected,ncol(tslaSelected))
+#tslaAddDiff =  addDiffVarF(tslaSelected,ncol(tslaSelected))
 ``` 
 #A few added indicators represent moving average of price or volume in a past designated period. Hence, we probably don't need to include lagged values. 
 #### Probably delete above codes later ##################
@@ -849,14 +837,14 @@ Up till now, we added xx stock indicators:
 
 
 ```{r assignYandX}
-tslaY  = tslaAddCCI %>%
+tslaY  = tslaAddVolTrend %>%
   na.omit() %>%
   dplyr::select(diffHighLow, stockReturn) %>%
   dplyr::as_tibble() %>%
   dplyr::slice(-1)
 
 
-tslaX    = tslaAddCCI %>%
+tslaX    = tslaAddVolTrend %>%
   na.omit() %>%
   .[1:(nrow(.)-1),] %>%
   dplyr::as_tibble(.) 
@@ -997,12 +985,13 @@ tslaLogReg = tslaFull %>%
 
 ```
 
-```{r removeHighCorr}
+```{r reviewHighCorr}
+
 hclustPlotF(tslaLogReg)
 XtslaLogReg = tslaLogReg %>%
   select(-diffHighLowTomorrow, -stockReturnTomorrow,-stockReturnTomorrowDummy)
 
-highCorrTsla = highCorrF(tslaFull,0.8)
+highCorrTsla = highCorrF(XtslaLogReg,0.8)
 highCorrTsla
 
 tslaLogRegRemoveCorr = XtslaLogReg %>% select(-highCorrTsla)
@@ -1096,49 +1085,6 @@ betaHatTsla
 ##Question: Collinearity in Elastic Net regression
 ```
 
-Many features in our data are not normally distributed, which violates the normality assumption for LDA. Thus, we'll fit our data with a logistic regression model. 
-
-```{r logisticRegression}
-
-trControl = trainControl(method = 'none')
-tslaOutLogistic = train(x = XtslaLogReg, y = YtslaDummy, method = 'glm', trControl = trControl)
-
-summary(tslaOutLogistic)
-
-
-#Forward Selection
-tslaOutForward = leaps::regsubsets(x =tslaLogRegRemoveCorr, y = factor(YtslaDummy$value.Increased), nvmax=ncol(tslaLogRegRemoveCorr), method='forward')
-tslaSumForward      = summary(tslaOutForward)
-tslamodelForward    = tslaSumForward$which[which.min(tslaSumForward$bic),]
-
-(tslaSelectedForward = tslamodelForward[-1])
-
-#####################################################################################
-#Use selected features from Forward Selection to fit another logistic model
-XtslaForward = as_tibble(select(XtslaFull, diffHighLow2  , diffLastOpen1,ASK_diff, cmf10))
-
-tslaOutLogistic2 = caret::train(x = XtslaForward, y = YtslaFull, method = 'lm', trControl = trControl)
-summary(tslaOutLogistic2)
-
-##alternative:use glm() and library(mass)
-library(MASS)
-XtslaLogReg = tslaLogReg %>%
-  select(-diffHighLowTomorrow, -stockReturnTomorrow,-stockReturnTomorrowDummy)
-
-tslaOutLogistic = glm(stockReturnTomorrowDummy ~ ., family = binomial, data = tslaLogReg)
-
-summary(tslaOutLogistic)
-library(bestglm)
-tslaBestGLM = 
-tslaBestGlmFit = bestglm::bestglm(dataframeWithYatLast, family = binomial, IC="BIC")
-
-tlsaLinearRegFull = tslaFull %>%
-  select(-stockReturnTomorrow)
-
-
-```
-
-
 
 ```{r dataSplit}
 set.seed(2020)
@@ -1176,34 +1122,6 @@ XtslaTrain = XtslaNNFull[trainIndex,] #After standardization, selected as traini
 XtslaTest  = XtslaNNFull[-trainIndex,]#After standardization, selected as test data
 ```
 
-```{r createDataForNN_Python}
-#Supervisors and features are all standardized except the dummy variables. 
-tslaY1 = YtslaNN$stockReturnTomorrow 
-tslaY2 = YtslaNN$stockReturnTomorrowDummy
-tslaY3 = YtslaNN$diffHighLowTomorrow
-
-#Supervisors
-write.csv(tslaY1,"D:/Mia/STAT/656/tslaSR_Y1.csv", 
-          row.names = FALSE)
-write.csv(tslaY2,"D:/Mia/STAT/656/tslaSRdummy_Y2.csv", 
-          row.names = FALSE)
-write.csv(tslaY3,"D:/Mia/STAT/656/tslaHL_Y3.csv", 
-          row.names = FALSE)
-#Feature Matrix
-write.csv(XtslaNNFull,"D:/Mia/STAT/656/XtslaNNFull.csv", 
-          row.names = FALSE)
-
-#Feature Matrix without highly correlated features
-write.csv(XtslaNNFullRemoveCorr,"D:/Mia/STAT/656/XtslaNNFullRemoveCorr.csv", 
-          row.names = FALSE)
-
-hclustPlotF(XtslaNNScaled)
-
-names(XtslaNNFull)
-
-names(XtslaNNFullRemoveCorr)
-names(high)
-```
 
 ```{r MARS}
 #Lecture 27
@@ -1507,6 +1425,31 @@ knitr::kable(
  align     = "lccrr"
 )
 ```
+
+```{r createCSVForNN_Python}
+#Supervisors and features are all standardized except the dummy variables. 
+tslaY1 = YtslaNN$stockReturnTomorrow 
+tslaY2 = YtslaNN$stockReturnTomorrowDummy
+tslaY3 = YtslaNN$diffHighLowTomorrow
+
+#Supervisors
+write.csv(tslaY1,"D:/Mia/STAT/656/tslaSR_Y1.csv", 
+          row.names = FALSE)
+write.csv(tslaY2,"D:/Mia/STAT/656/tslaSRdummy_Y2.csv", 
+          row.names = FALSE)
+write.csv(tslaY3,"D:/Mia/STAT/656/tslaHL_Y3.csv", 
+          row.names = FALSE)
+#Feature Matrix
+write.csv(XtslaNNFull,"D:/Mia/STAT/656/XtslaNNFull.csv", 
+          row.names = FALSE)
+
+#Feature Matrix without highly correlated features
+write.csv(XtslaNNFullRemoveCorr,"D:/Mia/STAT/656/XtslaNNFullRemoveCorr.csv",
+          row.names = FALSE)
+
+hclustPlotF(XtslaNNScaled)
+```
+
 
 ```{r modelPerformance}
 #Calculate test errors
