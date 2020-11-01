@@ -521,12 +521,13 @@ All `r ncol(googSelected)` selected variables in Google stock data are quantitat
 ```{r highCorr}
 #Recall highly correlated variables before making changes
 
+#TSLA
 highCorrTsla = tslaSelected %>%
   cor %>%
   caret::findCorrelation(.8, names = TRUE)
 highCorrTsla
 corrplot::corrplot(cor(tslaSelected), order="hclust")
-
+#GOOG
 highCorrGoog = googSelected %>%
   cor %>%
   caret::findCorrelation(.8, names = TRUE)
@@ -585,8 +586,21 @@ hclustPlotF = function(dta) {
 }
 
 ###GOOG
-
-
+googTemp = googSelected %>% 
+  dplyr::mutate(
+         PP = lag((PX_HIGH + PX_LOW + PX_LAST)/3), #Previous Day (High + Low + Close) / 3
+         R1 = 2 * PP - lag(PX_LOW),                #(Pivot x 2) – Previous Day Low
+         S1 = 2 * PP - lag(PX_HIGH),               #(Pivot x 2) – Previous Day High
+         R2 = PP + (R1 - S1),                      #Pivot + (R1 – S1)
+         S2 = PP - (R1 - S1),                      #Pivot - (R1 – S1)
+         R3 = lag(PX_HIGH) + 2 * (PP - lag(PX_LOW)),    
+         #R3= Previous Day High + 2(PP – Previous Day Low)
+         S3 = lag(PX_LOW) - 2 * (lag(PX_HIGH) - PP),
+         #S3= Previous Day Low – 2(Previous Day High – Pivot)
+         diffHighLow  = PX_HIGH - PX_LOW,
+         diffLastOpen = PX_LAST - PX_OPEN,
+         stockReturn  = (PX_LAST - PX_OPEN)/PX_OPEN
+         )
 ```
 
 On Balance Volume is calculated by adding the day's volume to a cumulative total when the security's price closes up, and subtracting the day's volume when the security's price closes down.
@@ -601,8 +615,14 @@ If today’s close is equal to yesterday’s close then:
 OBV = Yesterday’s OBV
 
 ```{r OnBalanceVolume}
+###TSLA
 tslaAddOBV = tslaTemp %>% 
   mutate(obv = TTR::OBV(PX_LAST, PX_VOLUME))
+
+###GOOG
+googAddOBV = googTemp %>% 
+  mutate(obv = TTR::OBV(PX_LAST, PX_VOLUME))
+
 ```
 
 #####Chaikin money flow
@@ -633,6 +653,9 @@ daysCMF = 21
 tslaAddCMF = tslaAddOBV %>%
   mutate(cmf = TTR::CMF(tslaAddOBV[,c("PX_HIGH","PX_LOW","PX_LAST")], PX_VOLUME, n = daysCMF))
 #GOOG
+daysCMF = 21
+googAddCMF = googAddOBV %>%
+  mutate(cmf = TTR::CMF(googAddOBV[,c("PX_HIGH","PX_LOW","PX_LAST")], PX_VOLUME, n = daysCMF))
 ```
 
 #####Exponential Moving Average (EMA)
@@ -656,6 +679,10 @@ tslaAddEMA = tslaAddCMF %>%
   mutate(emaVolume = TTR::EMA(tslaAddCMF$PX_VOLUME,daysEMA))
 
 ###GOOG
+daysEMA = 10 #EMA lengths
+googAddEMA = googAddCMF %>%
+  mutate(emaPrice = TTR::EMA(googAddCMF$PX_LAST,daysEMA)) %>%
+  mutate(emaVolume = TTR::EMA(googAddCMF$PX_VOLUME,daysEMA))
 ```
 
 ```{r relativeStrengthIndex(RSI)}
@@ -664,17 +691,23 @@ daysRSI = 14
 tslaAddRSI = tslaAddEMA %>%
   mutate(rsi = TTR::RSI(PX_LAST, n=daysRSI, maType="WMA", wts=PX_VOLUME))
 ###GOOG
+daysRSI = 14
+googAddRSI = googAddEMA %>%
+  mutate(rsi = TTR::RSI(PX_LAST, n=daysRSI, maType="WMA", wts=PX_VOLUME))
 ```
 
 SMA calculates the arithmetic mean of the series over the past n observations.
 ```{r simpleMovingAverage(SMA)}
 ###Tsla
-
 daysSMA = 10
 tslaAddSMA = tslaAddRSI %>%
   mutate(smaPrice = TTR::SMA(PX_LAST, n=daysSMA)) %>%
   mutate(smaVolume = TTR::SMA(PX_VOLUME, n=daysSMA))
 ###GOOG
+daysSMA = 10
+googAddSMA = googAddRSI %>%
+  mutate(smaPrice = TTR::SMA(PX_LAST, n=daysSMA)) %>%
+  mutate(smaVolume = TTR::SMA(PX_VOLUME, n=daysSMA))
 ```
 
 ```{r momentumStochasticIndex(K% and D%)}
@@ -687,13 +720,22 @@ tslaAddK = tslaAddSMA %>%
  dplyr::mutate(smi_K = (stoch(tslaHLC, nFastK = daysK, nFastD = daysD, nSlowD = 3, bounded = TRUE,smooth = 1))[,1]) %>% #calculate fastK%
  dplyr::mutate(smi_D = (stoch(tslaHLC, nFastK = daysK, nFastD = daysD, nSlowD = 3, bounded = TRUE,smooth = 1))[,2])  #calculate fastD%
 
+###GOOG
+daysK = 5 #%K is usually set to 5 and represents the main movements of price – slow line.
+daysD = 3 #%D is the fast line, a simple moving average of the %K and is set to 3.
+googHLC  = googSelected %>% dplyr::select(PX_HIGH, PX_LOW, PX_LAST)
+googAddK = googAddSMA %>%
+ dplyr::mutate(smi_K = (stoch(googHLC, nFastK = daysK, nFastD = daysD, nSlowD = 3, bounded = TRUE,smooth = 1))[,1]) %>% #calculate fastK%
+ dplyr::mutate(smi_D = (stoch(googHLC, nFastK = daysK, nFastD = daysD, nSlowD = 3, bounded = TRUE,smooth = 1))[,2])  #calculate fastD%
+
 #bounded:Logical, should current period’s values be used in the calculation? Set it as TRUE here. We will align Y's with past X's in Section xxx.
 #Reference:https://library.tradingtechnologies.com/trade/chrt-ti-stochastic-momentum-index.html
-###GOOG
+
 ```
 
 ### Moving Average Convergence Divergence
 ```{r MACD}
+###TSLA
 daysMACDslow   = 26 #default nSlow
 daysMACDfast   = 12 #default nFast
 daysMACDsignal = 9  #default nSig
@@ -703,39 +745,69 @@ tslaAddMACD = tslaAddK %>%
   #mutate(macdPrice = TTR::MACD(nFast = 12, nSlow = 26, nSig = 9, maType="WMA", wts=PX_VOLUME)) %>% # weighted macdPrice
   mutate(macdVolume = (TTR::MACD(PX_VOLUME, nFast = daysMACDfast, nSlow = daysMACDslow, nSig = daysMACDsignal))[,1])
 
+###GOOG
+daysMACDslow   = 26 #default nSlow
+daysMACDfast   = 12 #default nFast
+daysMACDsignal = 9  #default nSig
 
+googAddMACD = googAddK %>%
+  mutate(macdPrice = (TTR::MACD(PX_LAST, nFast = daysMACDfast, nSlow = daysMACDslow, nSig = daysMACDsignal))[,1]) %>%
+  #mutate(macdPrice = TTR::MACD(nFast = 12, nSlow = 26, nSig = 9, maType="WMA", wts=PX_VOLUME)) %>% # weighted macdPrice
+  mutate(macdVolume = (TTR::MACD(PX_VOLUME, nFast = daysMACDfast, nSlow = daysMACDslow, nSig = daysMACDsignal))[,1])
 ```
 
 ```{r LarryWilliam's R%}
+###TSLA
 daysR = 14 #default
 #tslaHLC  = tslaSelected %>% dplyr::select(PX_HIGH, PX_LOW, PX_LAST)
 tslaAddR = tslaAddMACD %>%
   mutate(larryWilliamsR = TTR::WPR(tslaHLC, n = daysR))
+
+###GOOG
+daysR = 14 #default
+#googHLC  = googSelected %>% dplyr::select(PX_HIGH, PX_LOW, PX_LAST)
+googAddR = googAddMACD %>%
+  mutate(larryWilliamsR = TTR::WPR(googHLC, n = daysR))
+
 ```
 
 TheWilliams Accumulation / Distribution (AD) line is a measure of market momentum. Developed by Larry Williams. The Williams AD line differs from OBV and chaikinAD in that it doesn’t take volume into account.
 ```{r Accumulation/Distribution}
+###TSLA
 tslaAddAD = tslaAddR %>%
   mutate(williamsAD = TTR::williamsAD(tslaHLC))
+###GOOG
+googAddAD = googAddR %>%
+  mutate(williamsAD = TTR::williamsAD(googHLC))
 
 ```
 
 The Commodity Channel Index (CCI) attempts to identify starting and ending trends.CCI relates the current price and the average of price over n periods. The CCI usually falls in a channel of -100 to 100. A basic CCI trading system is: Buy (sell) if CCI rises above 100 (falls below -100) and sell (buy) when it falls below 100 (rises above -100).
 
 ```{r CommodityChannelIndex(CCI)}
+###TSLA
 daysCCI = 20
 tslaAddCCI = tslaAddAD %>%
   mutate(cci = TTR::CCI(tslaHLC, n = daysCCI))
+
+###GOOG
+daysCCI = 20
+googAddCCI = googAddAD %>%
+  mutate(cci = TTR::CCI(googHLC, n = daysCCI))
+
 #--End--#
 
 #Summarize how many indicators we've added. 
 
-beforeAfterVar = tslaAddCCI[,(ncol(tslaSelected)+1):ncol(tslaAddCCI)]
-names(beforeAfterVar)
+beforeAfterVarTsla = tslaAddCCI[,(ncol(tslaSelected)+1):ncol(tslaAddCCI)]
+names(beforeAfterVarTsla)
 
+beforeAfterVarGoog = googAddCCI[,(ncol(googSelected)+1):ncol(googAddCCI)]
+names(beforeAfterVarGoog)
 ```
 
 ```{r additionMeasuresOnStockTrend}
+###TSLA
 #Calculate stock price trend supported with significant volume increase
 tslaAddVolYesterday = addLaggedVarF(tslaAddCCI$PX_VOLUME,tslaAddCCI, "pastVolume", 1)
 tslaAddPx_lastYesterday = addLaggedVarF(tslaAddVolYesterday$PX_LAST,tslaAddVolYesterday, "pastLastPrice", 1)
@@ -764,11 +836,11 @@ varPastVolumesF = function(featureVolume,lagsize) {
   return(pastVol_upper)
 }
 
-pastVol_upper = varPastVolumesF(tslaAddVolTemp$PX_VOLUME,5) 
+pastVol_upperTsla = varPastVolumesF(tslaAddVolTemp1$PX_VOLUME,5) 
 #pastVol_upper[1:20]
 
 tslaAddVolTemp2 = tslaAddVolTemp1 %>%
-  mutate(pastVol_upper) %>%
+  mutate(pastVol_upperTsla) %>%
   mutate(afterHourDiffPriceRatio = (PX_OPEN - pastLastPrice1)/pastLastPrice1) %>% 
   #afterHourDiffPrice = closePrice_yesterday - openPrice_today
   mutate(largerThanUpperVol = rep(0.0123, nrow(.)))
@@ -783,23 +855,70 @@ for (i in 1:nrow(tslaAddVolTemp2)) {
   }
 }
 
-names(tslaAddVolTemp3)
+#names(tslaAddVolTemp2)
 #Add interaction terms
 tslaAddVolTrend = tslaAddVolTemp2 %>% 
   mutate(increaseTrend = diffLastOpen * increasedVolume) %>%
   mutate(strongIncreaseTrend = diffLastOpen * largerThanUpperVol) %>%
-  select(- c(pastVolume1,pastLastPrice1,diffVolume,increasedVolume,pastVol_upper,largerThanUpperVol))
+  select(- c(pastVolume1,pastLastPrice1,diffVolume,increasedVolume,pastVol_upperTsla,largerThanUpperVol))
 
+
+
+###GOOG
+#Calculate stock price trend supported with significant volume increase
+googAddVolYesterday = addLaggedVarF(googAddCCI$PX_VOLUME,googAddCCI, "pastVolume", 1)
+googAddPx_lastYesterday = addLaggedVarF(googAddVolYesterday$PX_LAST,googAddVolYesterday, "pastLastPrice", 1)
+
+googAddVolTemp1 = googAddPx_lastYesterday %>%
+  mutate(diffVolume = PX_VOLUME - pastVolume1) %>%
+  dplyr::slice(-1) %>%
+  mutate(increasedVolume = rep(0.01, nrow(.)))
+
+for (i in 1:nrow(googAddVolTemp1)) {
+  if (googAddVolTemp1$diffVolume[i] <=0 ) {
+    googAddVolTemp1$increasedVolume[i] = 0
+  } else {
+    googAddVolTemp1$increasedVolume[i] = 1*googAddVolTemp1$diffVolume[i] 
+  }
+}
+
+pastVol_upperGoog = varPastVolumesF(googAddVolTemp1$PX_VOLUME,5) 
+#pastVol_upper[1:20]
+
+googAddVolTemp2 = googAddVolTemp1 %>%
+  mutate(pastVol_upperGoog) %>%
+  mutate(afterHourDiffPriceRatio = (PX_OPEN - pastLastPrice1)/pastLastPrice1) %>% 
+  #afterHourDiffPrice = closePrice_yesterday - openPrice_today
+  mutate(largerThanUpperVol = rep(0.0123, nrow(.)))
+
+#Valid volume increase (when the current volume is larger than the upper bound of volumes in past five days including the current date.)
+
+for (i in 1:nrow(googAddVolTemp2)) {
+  if (googAddVolTemp2$PX_VOLUME[i] < googAddVolTemp2$pastVol_upperGoog[i]) {
+    googAddVolTemp2$largerThanUpperVol[i] = 0
+  } else {
+    googAddVolTemp2$largerThanUpperVol[i] = 1*googAddVolTemp2$diffVolume[i] 
+  }
+}
+
+#names(googAddVolTemp2)
+#Add interaction terms
+googAddVolTrend = googAddVolTemp2 %>% 
+  mutate(increaseTrend = diffLastOpen * increasedVolume) %>%
+  mutate(strongIncreaseTrend = diffLastOpen * largerThanUpperVol) %>%
+  select(- c(pastVolume1,pastLastPrice1,diffVolume,increasedVolume,pastVol_upperGoog,largerThanUpperVol))
 
 ```
 
-Up till now, we added xx stock indicators:
-`r names(beforeAfterVar)`
+Up till now, we added:
+*TSLA stock indicators
+`r names(beforeAfterVarTsla)`
 
+*GOOG stock indicators
+`r names(beforeAfterVarGoog)`
 
-```{r addLaggedVariables}
-#Add lagged values of features. We'll fit time series models later. This can be a fairly good alternative for TS models, which saves us from running the stationarity test for each feature. 
-
+```{r addLaggedVariablesFunctions}
+#Add lagged values of features. 
 addLaggedVarF = function(feature, dataForModification, featureName,lagSize ) {
   for (lags in 1:lagSize) { 
     newColName = paste0(featureName, lags)
@@ -838,12 +957,12 @@ Up till now, we added xx stock indicators:
 
 
 ```{r assignYandX}
+###TSLA
 tslaY  = tslaAddVolTrend %>%
   na.omit() %>%
   dplyr::select(diffHighLow, stockReturn) %>%
   dplyr::as_tibble() %>%
   dplyr::slice(-1)
-
 
 tslaX    = tslaAddVolTrend %>%
   na.omit() %>%
@@ -859,15 +978,32 @@ tslaFull = dplyr::as_tibble(cbind(tslaY,tslaX))
 
 #summary(tslaY$diffHighLowTomorrow)
 
+##GOOG
+googY  = googAddVolTrend %>%
+  na.omit() %>%
+  dplyr::select(diffHighLow, stockReturn) %>%
+  dplyr::as_tibble() %>%
+  dplyr::slice(-1)
+
+
+googX    = googAddVolTrend %>%
+  na.omit() %>%
+  .[1:(nrow(.)-1),] %>%
+  dplyr::as_tibble(.) 
+
+names(googY)[1] = "diffHighLowTomorrow" #Y1
+names(googY)[2] = "stockReturnTomorrow" #Y2
+
+googFull = dplyr::as_tibble(cbind(googY,googX))
+
 ```
 
 ```{r PCA Regression}
+###TSLA
 #It's suggested to use only quantitative variables in PCA regression
-
 #Transform the selected data
 
 (tslaXTrans = caret::preProcess(as.data.frame(tslaX), method = c("BoxCox","center","scale","pca")))
-
 
 #Apply the transformations("BoxCox","center","scale","pca")
 pcaTslaX = stats::predict(tslaXTrans,as.data.frame(tslaX)) #Outputs are PCA components
@@ -880,7 +1016,6 @@ propVar_pcaTslaX = as.data.frame(tslaX) %>%
                  stats::prcomp() %>%
                  summary()
 propVar_pcaTslaX #proportion of variance explained by each PCs
-
 
 #Check extreme observations via PCA
 
@@ -896,8 +1031,10 @@ ggplot(data = pcaTslaX)+
 plot3D::scatter3D(pcaTslaX$PC1, pcaTslaX$PC2, pcaTslaX$PC3, pch = 16,  
                   theta = 20, phi = 20, main = "PCA - Tesla", xlab = "PC1", 
                   ylab ="PC2", zlab = "PC3", bty = "g", ticktype = "detailed")
+#One outlier. 
 
-#diffHighLow vs PCs
+##diffHighLow vs PCs
+# PC1 (better result for classification)
 ggplot(data = pcaTslaX)+
   geom_point(aes(x = PC1, y=tslaY$diffHighLowTomorrow), color=ifelse(tslaY$diffHighLowTomorrow > mean(tslaY$diffHighLowTomorrow),"red", "blue"))
 
@@ -905,10 +1042,7 @@ ggplot(data = pcaTslaX)+
   geom_point(aes(x = PC1, y=tslaY$diffHighLowTomorrow)
 , color=ifelse(tslaX$diffHighLow > mean(tslaX$diffHighLow),"red", "blue"))
 
-ggplot(data = pcaTslaX)+
-  geom_point(aes(x = PC1, y=tslaY$diffHighLowTomorrow)
-, color=ifelse(tslaX$stockReturn > mean(tslaX$stockReturn),"red", "blue"))
-
+# PC2 (impossible to classify Y)
 ggplot(data = pcaTslaX)+
   geom_point(aes(x = PC2, y=tslaY$diffHighLowTomorrow), color=ifelse(tslaY$diffHighLowTomorrow > mean(tslaY$diffHighLowTomorrow),"red", "blue"))
 
@@ -916,10 +1050,7 @@ ggplot(data = pcaTslaX)+
   geom_point(aes(x = PC2, y=tslaY$diffHighLowTomorrow)
 , color=ifelse(tslaX$diffHighLow > mean(tslaX$diffHighLow),"red", "blue"))
 
-ggplot(data = pcaTslaX)+
-  geom_point(aes(x = PC2, y=tslaY$diffHighLowTomorrow)
-, color=ifelse(tslaX$stockReturn > mean(tslaX$stockReturn),"red", "blue"))
-
+# PC3 (impossible to classify Y)
 ggplot(data = pcaTslaX)+
   geom_point(aes(x = PC3, y=tslaY$diffHighLowTomorrow)
              , color=ifelse(tslaY$diffHighLowTomorrow > mean(tslaY$diffHighLowTomorrow),"red", "blue"))
@@ -928,30 +1059,111 @@ ggplot(data = pcaTslaX)+
   geom_point(aes(x = PC3, y=tslaY$diffHighLowTomorrow)
 , color=ifelse(tslaX$diffHighLow > mean(tslaX$diffHighLow),"red", "blue"))
 
-ggplot(data = pcaTslaX)+
-  geom_point(aes(x = PC3, y=tslaY$diffHighLowTomorrow)
-, color=ifelse(tslaX$stockReturn > mean(tslaX$stockReturn),"red", "blue"))
-
+# 3D Plot(PC1, PC3, diffHighLowTomorrow)
+############################!!!!!!!!!!add legends for colors
 scatterplot3d::scatterplot3d(x = pcaTslaX$PC1, y = pcaTslaX$PC2,
                              z = tslaY$diffHighLowTomorrow, pch = 16, color = ifelse(tslaY$diffHighLowTomorrow > mean(tslaY$diffHighLowTomorrow),"red", "blue"))
+############################!!!!!!!!!!add legends for colors
+scatterplot3d::scatterplot3d(x = pcaTslaX$PC1, y = pcaTslaX$PC2,
+                             z = tslaY$diffHighLowTomorrow, pch = 16, color = ifelse(tslaX$diffHighLow > mean(tslaX$diffHighLow),"red", "blue"))
 
-#stockReturn vs PCs
-
+##stockReturn vs PCs
+# PC1 (Impossible to classify Y)
 ggplot(data = pcaTslaX)+
   geom_point(aes(x = PC1, y=tslaY$stockReturnTomorrow), color=ifelse(tslaX$stockReturn > mean(tslaX$stockReturn),"red", "blue"))
 
+# PC2 (Better)
 ggplot(data = pcaTslaX)+
-  geom_point(aes(x = PC1, y=tslaY$stockReturnTomorrow), color=ifelse(tslaX$diffHighLow > mean(tslaX$diffHighLow),"red", "blue")) 
-
+  geom_point(aes(x = PC2, y=tslaY$stockReturnTomorrow), color=ifelse(tslaX$stockReturn > mean(tslaX$stockReturn),"red", "blue"))
+# PC3 (Better)
 ggplot(data = pcaTslaX)+
-  geom_point(aes(x = PC1, y=tslaY$stockReturnTomorrow), color=ifelse(tslaX$stockReturn > mean(tslaX$stockReturn),"red", "blue"))
+  geom_point(aes(x = PC3, y=tslaY$stockReturnTomorrow), color=ifelse(tslaX$stockReturn > mean(tslaX$stockReturn),"red", "blue"))
 
-ggplot(data = pcaTslaX)+
-  geom_point(aes(x = PC2, y=tslaY$stockReturnTomorrow))
 
-ggplot(data = pcaTslaX)+
-  geom_point(aes(x = PC3, y=tslaY$stockReturnTomorrow))
 
+
+
+###GOOG
+
+#Transform the selected data
+(googXTrans = caret::preProcess(as.data.frame(googX), method = c("BoxCox","center","scale","pca")))
+
+#Apply the transformations("BoxCox","center","scale","pca")
+pcaGoogX = stats::predict(googXTrans,as.data.frame(googX)) #Outputs are PCA components
+#head(pcaTslaX)
+
+#Summary of PCA results
+googXTrans_     = caret::preProcess(as.data.frame(googX), method = c("BoxCox","center","scale"))
+propVar_pcaGoogX = as.data.frame(googX) %>%
+                 stats::predict(googXTrans_,.) %>%
+                 stats::prcomp() %>%
+                 summary()
+propVar_pcaGoogX #proportion of variance explained by each PCs
+
+#Check extreme observations via PCA
+
+ggplot(data = pcaGoogX)+
+  geom_point(aes(x = PC1, y= PC2))
+
+ggplot(data = pcaGoogX)+
+  geom_point(aes(x = PC3, y= PC2))
+
+ggplot(data = pcaGoogX)+
+  geom_point(aes(x = PC1, y= PC3))
+
+plot3D::scatter3D(pcaGoogX$PC1, pcaGoogX$PC2, pcaGoogX$PC3, pch = 16,  
+                  theta = 20, phi = 20, main = "PCA - GOOG", xlab = "PC1", 
+                  ylab ="PC2", zlab = "PC3", bty = "g", ticktype = "detailed")
+#Two or a few more outliers. 
+
+##diffHighLow vs PCs
+# PC1 (better result for classification)
+ggplot(data = pcaGoogX)+
+  geom_point(aes(x = PC1, y=googY$diffHighLowTomorrow), color=ifelse(googY$diffHighLowTomorrow > mean(googY$diffHighLowTomorrow),"red", "blue"))
+
+ggplot(data = pcaGoogX)+
+  geom_point(aes(x = PC1, y=googY$diffHighLowTomorrow)
+, color=ifelse(googX$diffHighLow > mean(googX$diffHighLow),"red", "blue"))
+
+# PC2 (impossible to classify Y)
+ggplot(data = pcaGoogX)+
+  geom_point(aes(x = PC2, y=googY$diffHighLowTomorrow), color=ifelse(googY$diffHighLowTomorrow > mean(googY$diffHighLowTomorrow),"red", "blue"))
+
+ggplot(data = pcaGoogX)+
+  geom_point(aes(x = PC2, y=googY$diffHighLowTomorrow)
+, color=ifelse(googX$diffHighLow > mean(googX$diffHighLow),"red", "blue"))
+
+# PC3 (impossible to classify Y)
+ggplot(data = pcaGoogX)+
+  geom_point(aes(x = PC3, y=googY$diffHighLowTomorrow)
+             , color=ifelse(googY$diffHighLowTomorrow > mean(googY$diffHighLowTomorrow),"red", "blue"))
+
+ggplot(data = pcaGoogX)+
+  geom_point(aes(x = PC3, y=googY$diffHighLowTomorrow)
+, color=ifelse(googX$diffHighLow > mean(googX$diffHighLow),"red", "blue"))
+
+# 3D Plot(PC1, PC3, diffHighLowTomorrow)
+
+############################!!!!!!!!!!add legends for colors
+scatterplot3d::scatterplot3d(x = pcaGoogX$PC1, y = pcaGoogX$PC2,
+                             z = googY$diffHighLowTomorrow, pch = 16, color = ifelse(googY$diffHighLowTomorrow > mean(googY$diffHighLowTomorrow),"red", "blue"))
+
+############################!!!!!!!!!!add legends for colors
+scatterplot3d::scatterplot3d(x = pcaGoogX$PC1, y = pcaGoogX$PC2,
+                             z = googY$diffHighLowTomorrow, pch = 16, color = ifelse(googX$diffHighLow > mean(googX$diffHighLow),"red", "blue"))
+
+
+##stockReturn vs PCs
+# PC1 (Impossible to classify Y)
+ggplot(data = pcaGoogX)+
+  geom_point(aes(x = PC1, y=googY$stockReturnTomorrow), color=ifelse(googX$stockReturn > mean(googX$stockReturn),"red", "blue"))
+
+# PC2 (Better)
+ggplot(data = pcaGoogX)+
+  geom_point(aes(x = PC2, y=googY$stockReturnTomorrow), color=ifelse(googX$stockReturn > mean(googX$stockReturn),"red", "blue"))
+# PC3 (Better)
+ggplot(data = pcaGoogX)+
+  geom_point(aes(x = PC3, y=googY$stockReturnTomorrow), color=ifelse(googX$stockReturn > mean(googX$stockReturn),"red", "blue"))
 
 ```
 
