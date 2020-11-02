@@ -1574,10 +1574,10 @@ max(glmnetCVTslaHL$results$Rsquared, na.rm = TRUE)
 
 #Variable Importance
 ##Supervisor = StockReturn
-marsVipTslaSR = vip::vip(marsTuneTslaSR, num_features = 41,  bar = NULL,geom = "point", value = "gcv")+ ggplot2::ggtitle("GCV - TSLA (47 Features)")
+marsVipTslaSR = vip::vip(marsTuneTslaSR, num_features = 47,  bar = NULL,geom = "point", value = "gcv")+ ggplot2::ggtitle("GCV - TSLA (47 Features)")
 plot(marsVipTslaSR)
 ##Supervisor = diffHighLoW
-marsVipTslaHL = vip::vip(marsTuneTslaHL, num_features = 41,  bar = NULL,geom = "point", value = "gcv")+ ggplot2::ggtitle("GCV - TSLA (47 Features)")
+marsVipTslaHL = vip::vip(marsTuneTslaHL, num_features = 47,  bar = NULL,geom = "point", value = "gcv")+ ggplot2::ggtitle("GCV - TSLA (47 Features)")
 plot(marsVipTslaHL)
 
 
