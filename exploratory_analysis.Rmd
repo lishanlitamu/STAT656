@@ -458,11 +458,10 @@ twitter_token <- rtweet::create_token(app = "BNC Sentiment Analysis", consumer_k
 positive_words <- base::data.frame(
   readxl::read_excel("2 - Word Lists/LoughranMcDonald_SentimentWordLists_2018.xlsx",
                      sheet = "Positive", col_names = F))$...1
-#positive_words <- positive_words$...1
+
 negative_words <- base::data.frame(
   readxl::read_excel("2 - Word Lists/LoughranMcDonald_SentimentWordLists_2018.xlsx",
                      sheet = "Negative", col_names = F))
-#negative_words <- negative_words$...1
 
 ## Loop through tickers and pull tweets
 sentiment <- base::data.frame("Ticker" = base::character(),
@@ -470,8 +469,8 @@ sentiment <- base::data.frame("Ticker" = base::character(),
                               "Sentiment" = base::numeric(), stringsAsFactors = F)
 for (ticker in c("TSLA", "GOOG")) {
   ## Pull tweets (this will throw an authentication page the first time)
-  ticker <- "TSLA"
-  tweets <- rtweet::search_tweets(q = base::paste0("$", ticker), n = 100000, include_rts = F,
+  search <- base::ifelse(ticker == "TSLA", "Tesla", "Google")
+  tweets <- rtweet::search_tweets(q = search, n = 10000, include_rts = F,
                                   retryonratelimit = T)
 
   ## Check sentiment
