@@ -467,7 +467,12 @@ negative_words <- base::data.frame(
 sentiment <- base::data.frame("Ticker" = base::character(),
                               "Date" = base::as.Date(base::character()),
                               "Sentiment" = base::numeric(), stringsAsFactors = F)
-for (ticker in c("TSLA", "GOOG")) {
+
+cl <- parallel::makeCluster(3, setup_strategy = "sequential")
+doParallel::registerDoParallel(cl)
+foreach(index = 1:2) %dopar% {
+  tickers <- c("TSLA", "GOOG"); ticker <- tickers[index]
+  
   ## Pull tweets (this will throw an authentication page the first time)
   search <- base::ifelse(ticker == "TSLA", "Tesla", "Google")
   tweets <- rtweet::search_tweets(q = search, n = 10000, include_rts = F,
@@ -492,10 +497,11 @@ for (ticker in c("TSLA", "GOOG")) {
   tmp <- tweets %>% dplyr::group_by(created_at) %>% dplyr::summarize("sentiment" = base::sum(sentiment))
   sentiment <- base::append(sentiment, tmp)
 }
+parallel::stopCluster(cl)
+foreach::registerDoSEQ()
+
 names(sentiment) <- c("TSLA", "GOOG")
 
-
-#head(tweets)
 ggplot2::ggplot(sentiment, ggplot2::aes(x = Date, y = Sentiment, color = Ticker)) + ggplot2::geom_line() + ggplot2::ggtitle("Twitter Sentiment Over Time")
 ```
 
