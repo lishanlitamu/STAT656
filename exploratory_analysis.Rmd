@@ -987,7 +987,8 @@ tslaY  = tslaAddVolTrend %>%
   na.omit() %>%
   dplyr::select(diffHighLow, stockReturn) %>%
   dplyr::as_tibble() %>%
-  dplyr::slice(-1)
+  dplyr::slice(-1) %>%
+  mutate(stockReturnDummy = if_else(stockReturn >= 0, 1, 0))
 
 tslaX    = tslaAddVolTrend %>%
   na.omit() %>%
@@ -996,6 +997,7 @@ tslaX    = tslaAddVolTrend %>%
 
 names(tslaY)[1] = "diffHighLowTomorrow" #Y1
 names(tslaY)[2] = "stockReturnTomorrow" #Y2
+names(tslaY)[3] = "stockReturnTomorrowDummy" #Y3
 
 tslaFull = dplyr::as_tibble(cbind(tslaY,tslaX))
 
@@ -1008,7 +1010,8 @@ googY  = googAddVolTrend %>%
   na.omit() %>%
   dplyr::select(diffHighLow, stockReturn) %>%
   dplyr::as_tibble() %>%
-  dplyr::slice(-1)
+  dplyr::slice(-1) %>%
+  mutate(stockReturnDummy = if_else(stockReturn >= 0, 1, 0))
 
 
 googX    = googAddVolTrend %>%
@@ -1018,178 +1021,14 @@ googX    = googAddVolTrend %>%
 
 names(googY)[1] = "diffHighLowTomorrow" #Y1
 names(googY)[2] = "stockReturnTomorrow" #Y2
+names(googY)[3] = "stockReturnTomorrowDummy" #Y3
 
 googFull = dplyr::as_tibble(cbind(googY,googX))
 
 ```
 
-```{r PCA Regression}
-###TSLA
-#It's suggested to use only quantitative variables in PCA regression
-#Transform the selected data
-
-(tslaXTrans = caret::preProcess(as.data.frame(tslaX), method = c("BoxCox","center","scale","pca")))
-
-#Apply the transformations("BoxCox","center","scale","pca")
-pcaTslaX = stats::predict(tslaXTrans,as.data.frame(tslaX)) #Outputs are PCA components
-#head(pcaTslaX)
-
-#Summary of PCA results
-tslaXTrans_     = caret::preProcess(as.data.frame(tslaX), method = c("BoxCox","center","scale"))
-propVar_pcaTslaX = as.data.frame(tslaX) %>%
-                 stats::predict(tslaXTrans_,.) %>%
-                 stats::prcomp() %>%
-                 summary()
-propVar_pcaTslaX #proportion of variance explained by each PCs
-
-#Check extreme observations via PCA
-ggplot(data = pcaTslaX)+
-  geom_point(aes(x = PC1, y= PC2))
-
-ggplot(data = pcaTslaX)+
-  geom_point(aes(x = PC3, y= PC2))
-
-ggplot(data = pcaTslaX)+
-  geom_point(aes(x = PC1, y= PC3))
-
-plot3D::scatter3D(pcaTslaX$PC1, pcaTslaX$PC2, pcaTslaX$PC3, pch = 16,  
-                  theta = 20, phi = 20, main = "PCA - Tesla", xlab = "PC1", 
-                  ylab ="PC2", zlab = "PC3", bty = "g", ticktype = "detailed")
-#One outlier. 
-
-##diffHighLow vs PCs
-# PC1 (better result for classification)
-ggplot(data = pcaTslaX)+
-  geom_point(aes(x = PC1, y=tslaY$diffHighLowTomorrow), color=ifelse(tslaY$diffHighLowTomorrow > mean(tslaY$diffHighLowTomorrow),"red", "blue"))
-
-ggplot(data = pcaTslaX)+
-  geom_point(aes(x = PC1, y=tslaY$diffHighLowTomorrow)
-, color=ifelse(tslaX$diffHighLow > mean(tslaX$diffHighLow),"red", "blue"))
-
-# PC2 (impossible to classify Y)
-ggplot(data = pcaTslaX)+
-  geom_point(aes(x = PC2, y=tslaY$diffHighLowTomorrow), color=ifelse(tslaY$diffHighLowTomorrow > mean(tslaY$diffHighLowTomorrow),"red", "blue"))
-
-ggplot(data = pcaTslaX)+
-  geom_point(aes(x = PC2, y=tslaY$diffHighLowTomorrow)
-, color=ifelse(tslaX$diffHighLow > mean(tslaX$diffHighLow),"red", "blue"))
-
-# PC3 (impossible to classify Y)
-ggplot(data = pcaTslaX)+
-  geom_point(aes(x = PC3, y=tslaY$diffHighLowTomorrow)
-             , color=ifelse(tslaY$diffHighLowTomorrow > mean(tslaY$diffHighLowTomorrow),"red", "blue"))
-
-ggplot(data = pcaTslaX)+
-  geom_point(aes(x = PC3, y=tslaY$diffHighLowTomorrow)
-, color=ifelse(tslaX$diffHighLow > mean(tslaX$diffHighLow),"red", "blue"))
-
-# 3D Plot(PC1, PC3, diffHighLowTomorrow)
-############################!!!!!!!!!!add legends for colors
-scatterplot3d::scatterplot3d(x = pcaTslaX$PC1, y = pcaTslaX$PC2,
-                             z = tslaY$diffHighLowTomorrow, pch = 16, color = ifelse(tslaY$diffHighLowTomorrow > mean(tslaY$diffHighLowTomorrow),"red", "blue"))
-############################!!!!!!!!!!add legends for colors
-scatterplot3d::scatterplot3d(x = pcaTslaX$PC1, y = pcaTslaX$PC2,
-                             z = tslaY$diffHighLowTomorrow, pch = 16, color = ifelse(tslaX$diffHighLow > mean(tslaX$diffHighLow),"red", "blue"))
-
-##stockReturn vs PCs
-# PC1 (Impossible to classify Y)
-ggplot(data = pcaTslaX)+
-  geom_point(aes(x = PC1, y=tslaY$stockReturnTomorrow), color=ifelse(tslaX$stockReturn > mean(tslaX$stockReturn),"red", "blue"))
-
-# PC2 (Better)
-ggplot(data = pcaTslaX)+
-  geom_point(aes(x = PC2, y=tslaY$stockReturnTomorrow), color=ifelse(tslaX$stockReturn > mean(tslaX$stockReturn),"red", "blue"))
-# PC3 (Better)
-ggplot(data = pcaTslaX)+
-  geom_point(aes(x = PC3, y=tslaY$stockReturnTomorrow), color=ifelse(tslaX$stockReturn > mean(tslaX$stockReturn),"red", "blue"))
 
 
-
-
-
-###GOOG
-
-#Transform the selected data
-(googXTrans = caret::preProcess(as.data.frame(googX), method = c("BoxCox","center","scale","pca")))
-
-#Apply the transformations("BoxCox","center","scale","pca")
-pcaGoogX = stats::predict(googXTrans,as.data.frame(googX)) #Outputs are PCA components
-#head(pcaTslaX)
-
-#Summary of PCA results
-googXTrans_     = caret::preProcess(as.data.frame(googX), method = c("BoxCox","center","scale"))
-propVar_pcaGoogX = as.data.frame(googX) %>%
-                 stats::predict(googXTrans_,.) %>%
-                 stats::prcomp() %>%
-                 summary()
-propVar_pcaGoogX #proportion of variance explained by each PCs
-
-#Check extreme observations via PCA
-
-ggplot(data = pcaGoogX)+
-  geom_point(aes(x = PC1, y= PC2))
-
-ggplot(data = pcaGoogX)+
-  geom_point(aes(x = PC3, y= PC2))
-
-ggplot(data = pcaGoogX)+
-  geom_point(aes(x = PC1, y= PC3))
-
-plot3D::scatter3D(pcaGoogX$PC1, pcaGoogX$PC2, pcaGoogX$PC3, pch = 16,  
-                  theta = 20, phi = 20, main = "PCA - GOOG", xlab = "PC1", 
-                  ylab ="PC2", zlab = "PC3", bty = "g", ticktype = "detailed")
-#Two or a few more outliers. 
-
-##diffHighLow vs PCs
-# PC1 (better result for classification)
-ggplot(data = pcaGoogX)+
-  geom_point(aes(x = PC1, y=googY$diffHighLowTomorrow), color=ifelse(googY$diffHighLowTomorrow > mean(googY$diffHighLowTomorrow),"red", "blue"))
-
-ggplot(data = pcaGoogX)+
-  geom_point(aes(x = PC1, y=googY$diffHighLowTomorrow)
-, color=ifelse(googX$diffHighLow > mean(googX$diffHighLow),"red", "blue"))
-
-# PC2 (impossible to classify Y)
-ggplot(data = pcaGoogX)+
-  geom_point(aes(x = PC2, y=googY$diffHighLowTomorrow), color=ifelse(googY$diffHighLowTomorrow > mean(googY$diffHighLowTomorrow),"red", "blue"))
-
-ggplot(data = pcaGoogX)+
-  geom_point(aes(x = PC2, y=googY$diffHighLowTomorrow)
-, color=ifelse(googX$diffHighLow > mean(googX$diffHighLow),"red", "blue"))
-
-# PC3 (impossible to classify Y)
-ggplot(data = pcaGoogX)+
-  geom_point(aes(x = PC3, y=googY$diffHighLowTomorrow)
-             , color=ifelse(googY$diffHighLowTomorrow > mean(googY$diffHighLowTomorrow),"red", "blue"))
-
-ggplot(data = pcaGoogX)+
-  geom_point(aes(x = PC3, y=googY$diffHighLowTomorrow)
-, color=ifelse(googX$diffHighLow > mean(googX$diffHighLow),"red", "blue"))
-
-# 3D Plot(PC1, PC3, diffHighLowTomorrow)
-
-############################!!!!!!!!!!add legends for colors
-scatterplot3d::scatterplot3d(x = pcaGoogX$PC1, y = pcaGoogX$PC2,
-                             z = googY$diffHighLowTomorrow, pch = 16, color = ifelse(googY$diffHighLowTomorrow > mean(googY$diffHighLowTomorrow),"red", "blue"))
-
-############################!!!!!!!!!!add legends for colors
-scatterplot3d::scatterplot3d(x = pcaGoogX$PC1, y = pcaGoogX$PC2,
-                             z = googY$diffHighLowTomorrow, pch = 16, color = ifelse(googX$diffHighLow > mean(googX$diffHighLow),"red", "blue"))
-
-
-##stockReturn vs PCs
-# PC1 (Impossible to classify Y)
-ggplot(data = pcaGoogX)+
-  geom_point(aes(x = PC1, y=googY$stockReturnTomorrow), color=ifelse(googX$stockReturn > mean(googX$stockReturn),"red", "blue"))
-
-# PC2 (Better)
-ggplot(data = pcaGoogX)+
-  geom_point(aes(x = PC2, y=googY$stockReturnTomorrow), color=ifelse(googX$stockReturn > mean(googX$stockReturn),"red", "blue"))
-# PC3 (Better)
-ggplot(data = pcaGoogX)+
-  geom_point(aes(x = PC3, y=googY$stockReturnTomorrow), color=ifelse(googX$stockReturn > mean(googX$stockReturn),"red", "blue"))
-
-```
 
 ##### 5.2 Linear Model
 ```{r dummyVarForLogisticRegression}
@@ -1456,57 +1295,237 @@ glmnetOutGoog = glmnet::glmnet(x = as.matrix(XgoogLinearReg), y = YgoogLinearReg
 
 ```
 
-##### 5.3 Nonlinear Model (KNN)
-
-```{r knnRegression}
-###TSLA
 
 
-
-
-###GOOG
-
-
-```
-
+##### 5.4 PCA regression
 ```{dataSplitPCA}
+#use data crearted in {r assignYandX}
 set.seed(2020)
 ###TSLA
-YtslaNN    = YtslaLinearReg #highly correlated features are removed; standardized
-trainIndex = caret::createDataPartition(YtslaNN$diffHighLowTomorrow, p = 0.25, list = FALSE)
+trainIndexHL_Tsla = caret::createDataPartition(tslaY$diffHighLowTomorrow, p = 0.25, list = FALSE)
+trainIndexSR_Tsla = caret::createDataPartition(tslaY$stockReturnTomorrow, p = 0.25, list = FALSE)
 
-YtslaTrain_DiffHighLow      = YtslaNN$diffHighLowTomorrow[trainIndex]
-YtslaTrain_StockReturn      = YtslaNN$stockReturnTomorrow[trainIndex]
-YtslaTrain_StockReturnDummy = YtslaNN$stockReturnTomorrowDummy[trainIndex]
+YtslaTrain_HL      = tslaY$diffHighLowTomorrow[trainIndexHL_Tsla]
+YtslaTrain_SR      = tslaY$stockReturnTomorrow [trainIndexSR_Tsla]
+YtslaTrain_SRDummy = tslaY$stockReturnTomorrowDummy[trainIndexSR_Tsla]
 
-YtslaTest_DiffHighLow       = YtslaNN$diffHighLowTomorrow[-trainIndex]
-YtslaTest_StockReturn       = YtslaNN$stockReturnTomorrow[-trainIndex]
-YtslaTest_StockReturnDummy  = YtslaNN$stockReturnTomorrowDummy [-trainIndex]
+YtslaTest_HL       = tslaY$diffHighLowTomorrow[-trainIndexHL_Tsla]
+YtslaTest_SR       = tslaY$stockReturnTomorrow [-trainIndexSR_Tsla]
+YtslaTest_SRDummy  = tslaY$stockReturnTomorrowDummy[-trainIndexSR_Tsla]
 
-XtslaNN    = XtslaLinearReg #highly correlated features are removed; standardized
 
-XtslaTrain = XtslaNN[trainIndex,] 
-XtslaTest  = XtslaNN[-trainIndex,]
+XtslaTrain_HL = tslaX[trainIndexHL_Tsla,] 
+XtslaTest_HL  = tslaX[-rainIndexHL_Tsla,]
+
+XtslaTrain_SR = tslaX[trainIndexSR_Tsla,] 
+XtslaTest_SR  = tslaX[-rainIndexSR_Tsla,]
+
 
 ###GOOG
-set.seed(2021)
-YgoogNN    = YgoogLinearReg #highly correlated features are removed; standardized
-trainIndex = caret::createDataPartition(YgoogNN$diffHighLowTomorrow, p = 0.25, list = FALSE)
+set.seed(2020)
 
-YgoogTrain_DiffHighLow      = YgoogNN$diffHighLowTomorrow[trainIndex]
-YgoogTrain_StockReturn      = YgoogNN$stockReturnTomorrow[trainIndex]
-YgoogTrain_StockReturnDummy = YgoogNN$stockReturnTomorrowDummy[trainIndex]
+trainIndexHL_Goog = caret::createDataPartition(googY$diffHighLowTomorrow, p = 0.25, list = FALSE)
+trainIndexSR_Goog = caret::createDataPartition(googY$stockReturnTomorrow, p = 0.25, list = FALSE)
 
-YgoogTest_DiffHighLow       = YgoogNN$diffHighLowTomorrow[-trainIndex]
-YgoogTest_StockReturn       = YgoogNN$stockReturnTomorrow[-trainIndex]
-YgoogTest_StockReturnDummy  = YgoogNN$stockReturnTomorrowDummy [-trainIndex]
+YgoogTrain_HL      = tslaY$diffHighLowTomorrow[trainIndexHL_Goog]
+YgoogTrain_SR      = tslaY$stockReturnTomorrow [trainIndexSR_Goog]
+YgoogTrain_SRDummy = tslaY$stockReturnTomorrowDummy[trainIndexSR_Goog]
 
-XgoogNN    = XgoogLinearReg
+YgoogTest_HL       = tslaY$diffHighLowTomorrow[-trainIndexHL_Goog]
+YgoogTest_SR       = tslaY$stockReturnTomorrow [-trainIndexSR_Goog]
+YgoogTest_SRDummy  = tslaY$stockReturnTomorrowDummy[-trainIndexSR_Goog]
 
-XgoogTrain = XgoogNN[trainIndex,] 
-XgoogTest  = XgoogNN[-trainIndex,]
+
+XgoogTrain_HL = tslaX[trainIndexHL_Goog,] 
+XgoogTest_HL  = tslaX[-rainIndexHL_Goog,]
+
+XgoogTrain_SR = tslaX[trainIndexSR_Goog,] 
+XgoogTest_SR  = tslaX[-rainIndexSR_Goog,]
+
 ```
 
+```{r PCA Regression}
+#use data crearted in {r assignYandX}
+
+###TSLA
+#It's suggested to use only quantitative variables in PCA regression
+#Transform the selected data
+
+(tslaXTrans = caret::preProcess(as.data.frame(tslaX), method = c("BoxCox","center","scale","pca")))
+
+#Apply the transformations("BoxCox","center","scale","pca")
+pcaTslaX = stats::predict(tslaXTrans,as.data.frame(tslaX)) #Outputs are PCA components
+#head(pcaTslaX)
+
+#Summary of PCA results
+tslaXTrans_     = caret::preProcess(as.data.frame(tslaX), method = c("BoxCox","center","scale"))
+propVar_pcaTslaX = as.data.frame(tslaX) %>%
+                 stats::predict(tslaXTrans_,.) %>%
+                 stats::prcomp() %>%
+                 summary()
+propVar_pcaTslaX #proportion of variance explained by each PCs
+
+#Check extreme observations via PCA
+ggplot(data = pcaTslaX)+
+  geom_point(aes(x = PC1, y= PC2))
+
+ggplot(data = pcaTslaX)+
+  geom_point(aes(x = PC3, y= PC2))
+
+ggplot(data = pcaTslaX)+
+  geom_point(aes(x = PC1, y= PC3))
+
+plot3D::scatter3D(pcaTslaX$PC1, pcaTslaX$PC2, pcaTslaX$PC3, pch = 16,  
+                  theta = 20, phi = 20, main = "PCA - Tesla", xlab = "PC1", 
+                  ylab ="PC2", zlab = "PC3", bty = "g", ticktype = "detailed")
+#One outlier. 
+
+##diffHighLow vs PCs
+# PC1 (better result for classification)
+ggplot(data = pcaTslaX)+
+  geom_point(aes(x = PC1, y=tslaY$diffHighLowTomorrow), color=ifelse(tslaY$diffHighLowTomorrow > mean(tslaY$diffHighLowTomorrow),"red", "blue"))
+
+ggplot(data = pcaTslaX)+
+  geom_point(aes(x = PC1, y=tslaY$diffHighLowTomorrow)
+, color=ifelse(tslaX$diffHighLow > mean(tslaX$diffHighLow),"red", "blue"))
+
+# PC2 (impossible to classify Y)
+ggplot(data = pcaTslaX)+
+  geom_point(aes(x = PC2, y=tslaY$diffHighLowTomorrow), color=ifelse(tslaY$diffHighLowTomorrow > mean(tslaY$diffHighLowTomorrow),"red", "blue"))
+
+ggplot(data = pcaTslaX)+
+  geom_point(aes(x = PC2, y=tslaY$diffHighLowTomorrow)
+, color=ifelse(tslaX$diffHighLow > mean(tslaX$diffHighLow),"red", "blue"))
+
+# PC3 (impossible to classify Y)
+ggplot(data = pcaTslaX)+
+  geom_point(aes(x = PC3, y=tslaY$diffHighLowTomorrow)
+             , color=ifelse(tslaY$diffHighLowTomorrow > mean(tslaY$diffHighLowTomorrow),"red", "blue"))
+
+ggplot(data = pcaTslaX)+
+  geom_point(aes(x = PC3, y=tslaY$diffHighLowTomorrow)
+, color=ifelse(tslaX$diffHighLow > mean(tslaX$diffHighLow),"red", "blue"))
+
+# 3D Plot(PC1, PC3, diffHighLowTomorrow)
+############################!!!!!!!!!!add legends for colors
+scatterplot3d::scatterplot3d(x = pcaTslaX$PC1, y = pcaTslaX$PC2,
+                             z = tslaY$diffHighLowTomorrow, pch = 16, color = ifelse(tslaY$diffHighLowTomorrow > mean(tslaY$diffHighLowTomorrow),"red", "blue"))
+############################!!!!!!!!!!add legends for colors
+scatterplot3d::scatterplot3d(x = pcaTslaX$PC1, y = pcaTslaX$PC2,
+                             z = tslaY$diffHighLowTomorrow, pch = 16, color = ifelse(tslaX$diffHighLow > mean(tslaX$diffHighLow),"red", "blue"))
+
+##stockReturn vs PCs
+# PC1 (Impossible to classify Y)
+ggplot(data = pcaTslaX)+
+  geom_point(aes(x = PC1, y=tslaY$stockReturnTomorrow), color=ifelse(tslaX$stockReturn > mean(tslaX$stockReturn),"red", "blue"))
+
+# PC2 (Better)
+ggplot(data = pcaTslaX)+
+  geom_point(aes(x = PC2, y=tslaY$stockReturnTomorrow), color=ifelse(tslaX$stockReturn > mean(tslaX$stockReturn),"red", "blue"))
+# PC3 (Better)
+ggplot(data = pcaTslaX)+
+  geom_point(aes(x = PC3, y=tslaY$stockReturnTomorrow), color=ifelse(tslaX$stockReturn > mean(tslaX$stockReturn),"red", "blue"))
+
+
+
+
+
+###GOOG
+
+#Transform the selected data
+(googXTrans = caret::preProcess(as.data.frame(googX), method = c("BoxCox","center","scale","pca")))
+
+#Apply the transformations("BoxCox","center","scale","pca")
+pcaGoogX = stats::predict(googXTrans,as.data.frame(googX)) #Outputs are PCA components
+#head(pcaTslaX)
+
+#Summary of PCA results
+googXTrans_     = caret::preProcess(as.data.frame(googX), method = c("BoxCox","center","scale"))
+propVar_pcaGoogX = as.data.frame(googX) %>%
+                 stats::predict(googXTrans_,.) %>%
+                 stats::prcomp() %>%
+                 summary()
+propVar_pcaGoogX #proportion of variance explained by each PCs
+
+#Check extreme observations via PCA
+
+ggplot(data = pcaGoogX)+
+  geom_point(aes(x = PC1, y= PC2))
+
+ggplot(data = pcaGoogX)+
+  geom_point(aes(x = PC3, y= PC2))
+
+ggplot(data = pcaGoogX)+
+  geom_point(aes(x = PC1, y= PC3))
+
+plot3D::scatter3D(pcaGoogX$PC1, pcaGoogX$PC2, pcaGoogX$PC3, pch = 16,  
+                  theta = 20, phi = 20, main = "PCA - GOOG", xlab = "PC1", 
+                  ylab ="PC2", zlab = "PC3", bty = "g", ticktype = "detailed")
+#Two or a few more outliers. 
+
+##diffHighLow vs PCs
+# PC1 (better result for classification)
+ggplot(data = pcaGoogX)+
+  geom_point(aes(x = PC1, y=googY$diffHighLowTomorrow), color=ifelse(googY$diffHighLowTomorrow > mean(googY$diffHighLowTomorrow),"red", "blue"))
+
+ggplot(data = pcaGoogX)+
+  geom_point(aes(x = PC1, y=googY$diffHighLowTomorrow)
+, color=ifelse(googX$diffHighLow > mean(googX$diffHighLow),"red", "blue"))
+
+# PC2 (impossible to classify Y)
+ggplot(data = pcaGoogX)+
+  geom_point(aes(x = PC2, y=googY$diffHighLowTomorrow), color=ifelse(googY$diffHighLowTomorrow > mean(googY$diffHighLowTomorrow),"red", "blue"))
+
+ggplot(data = pcaGoogX)+
+  geom_point(aes(x = PC2, y=googY$diffHighLowTomorrow)
+, color=ifelse(googX$diffHighLow > mean(googX$diffHighLow),"red", "blue"))
+
+# PC3 (impossible to classify Y)
+ggplot(data = pcaGoogX)+
+  geom_point(aes(x = PC3, y=googY$diffHighLowTomorrow)
+             , color=ifelse(googY$diffHighLowTomorrow > mean(googY$diffHighLowTomorrow),"red", "blue"))
+
+ggplot(data = pcaGoogX)+
+  geom_point(aes(x = PC3, y=googY$diffHighLowTomorrow)
+, color=ifelse(googX$diffHighLow > mean(googX$diffHighLow),"red", "blue"))
+
+# 3D Plot(PC1, PC3, diffHighLowTomorrow)
+
+############################!!!!!!!!!!add legends for colors
+scatterplot3d::scatterplot3d(x = pcaGoogX$PC1, y = pcaGoogX$PC2,
+                             z = googY$diffHighLowTomorrow, pch = 16, color = ifelse(googY$diffHighLowTomorrow > mean(googY$diffHighLowTomorrow),"red", "blue"))
+
+############################!!!!!!!!!!add legends for colors
+scatterplot3d::scatterplot3d(x = pcaGoogX$PC1, y = pcaGoogX$PC2,
+                             z = googY$diffHighLowTomorrow, pch = 16, color = ifelse(googX$diffHighLow > mean(googX$diffHighLow),"red", "blue"))
+
+
+##stockReturn vs PCs
+# PC1 (Impossible to classify Y)
+ggplot(data = pcaGoogX)+
+  geom_point(aes(x = PC1, y=googY$stockReturnTomorrow), color=ifelse(googX$stockReturn > mean(googX$stockReturn),"red", "blue"))
+
+# PC2 (Better)
+ggplot(data = pcaGoogX)+
+  geom_point(aes(x = PC2, y=googY$stockReturnTomorrow), color=ifelse(googX$stockReturn > mean(googX$stockReturn),"red", "blue"))
+# PC3 (Better)
+ggplot(data = pcaGoogX)+
+  geom_point(aes(x = PC3, y=googY$stockReturnTomorrow), color=ifelse(googX$stockReturn > mean(googX$stockReturn),"red", "blue"))
+
+```
+
+##### 5.3 Nonlinear Model (KNN)
+
+```{r knnRegression_PCA}
+###TSLA
+
+
+
+
+###GOOG
+
+
+```
 ```{r knnClassification_PCA}
 
 ###TSLA
