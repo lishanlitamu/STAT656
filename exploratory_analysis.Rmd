@@ -1043,7 +1043,6 @@ propVar_pcaTslaX = as.data.frame(tslaX) %>%
 propVar_pcaTslaX #proportion of variance explained by each PCs
 
 #Check extreme observations via PCA
-
 ggplot(data = pcaTslaX)+
   geom_point(aes(x = PC1, y= PC2))
 
@@ -1457,7 +1456,94 @@ glmnetOutGoog = glmnet::glmnet(x = as.matrix(XgoogLinearReg), y = YgoogLinearReg
 
 ```
 
-##### 5.3 Nonlinear Model (MARS)
+##### 5.3 Nonlinear Model (KNN)
+
+```{r knnRegression}
+###TSLA
+
+
+
+
+###GOOG
+
+
+```
+
+```{dataSplitPCA}
+set.seed(2020)
+###TSLA
+YtslaNN    = YtslaLinearReg #highly correlated features are removed; standardized
+trainIndex = caret::createDataPartition(YtslaNN$diffHighLowTomorrow, p = 0.25, list = FALSE)
+
+YtslaTrain_DiffHighLow      = YtslaNN$diffHighLowTomorrow[trainIndex]
+YtslaTrain_StockReturn      = YtslaNN$stockReturnTomorrow[trainIndex]
+YtslaTrain_StockReturnDummy = YtslaNN$stockReturnTomorrowDummy[trainIndex]
+
+YtslaTest_DiffHighLow       = YtslaNN$diffHighLowTomorrow[-trainIndex]
+YtslaTest_StockReturn       = YtslaNN$stockReturnTomorrow[-trainIndex]
+YtslaTest_StockReturnDummy  = YtslaNN$stockReturnTomorrowDummy [-trainIndex]
+
+XtslaNN    = XtslaLinearReg #highly correlated features are removed; standardized
+
+XtslaTrain = XtslaNN[trainIndex,] 
+XtslaTest  = XtslaNN[-trainIndex,]
+
+###GOOG
+set.seed(2021)
+YgoogNN    = YgoogLinearReg #highly correlated features are removed; standardized
+trainIndex = caret::createDataPartition(YgoogNN$diffHighLowTomorrow, p = 0.25, list = FALSE)
+
+YgoogTrain_DiffHighLow      = YgoogNN$diffHighLowTomorrow[trainIndex]
+YgoogTrain_StockReturn      = YgoogNN$stockReturnTomorrow[trainIndex]
+YgoogTrain_StockReturnDummy = YgoogNN$stockReturnTomorrowDummy[trainIndex]
+
+YgoogTest_DiffHighLow       = YgoogNN$diffHighLowTomorrow[-trainIndex]
+YgoogTest_StockReturn       = YgoogNN$stockReturnTomorrow[-trainIndex]
+YgoogTest_StockReturnDummy  = YgoogNN$stockReturnTomorrowDummy [-trainIndex]
+
+XgoogNN    = XgoogLinearReg
+
+XgoogTrain = XgoogNN[trainIndex,] 
+XgoogTest  = XgoogNN[-trainIndex,]
+```
+
+```{r knnClassification_PCA}
+
+###TSLA
+#Supervisor = diffHighLowTomorrow
+tuneGridTslaKNN = expand.grid(k = c(1,2,3,4,5,10,20,30,40,50))
+knnOutTsla = train(x = pcaTslaX[,1:5], y = tslaY$diffHighLowTomorrow,
+                   method = "knn",
+                   tuneGrid = tuneGridTslaKNN,
+                   trControl = trainControl(method = 'cv', number = 10))
+k_TslaKNN = knnOutTsla$finalModel$k
+
+knnOutTsla$results$Rsquared
+knnOutTsla$results$RMSE
+
+tslaKNNTest
+
+#Supervisor = stockReturnTomorrow
+#tuneGridTslaKNN = expand.grid(k = c(1,2,10,50,100,180))
+knnOutTsla = train(x = pcaTslaX[,1:5], y = tslaY$stockReturnTomorrow,
+                   method = "knn",
+                   tuneGrid = tuneGridTslaKNN,
+                   trControl = trainControl(method = 'cv', number = 10))
+
+diffHighLowTomorrowPred = predict(knnOutTsla, pcaTslaX[,1:5])
+residTslaKNN_HL = tslaY$diffHighLowTomorrow - diffHighLowTomorrowPred
+plot(tslaY$diffHighLowTomorrow, residTslaKNN_HL)
+
+
+
+###GOOG
+
+
+```
+
+
+
+##### 5.4 Nonlinear Model (MARS)
 
 ```{r dataSplit}
 set.seed(2020)
