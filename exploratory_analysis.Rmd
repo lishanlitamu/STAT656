@@ -484,6 +484,7 @@ sentiment <- base::data.frame("Ticker" = base::character(),
 cl <- parallel::makeCluster(3, setup_strategy = "sequential")
 doParallel::registerDoParallel(cl)
 foreach(index = 1:2) %dopar% {
+## Twitter API keys and secrets
   library(dplyr)
   tickers <- c("TSLA", "GOOG"); ticker <- tickers[index]
   
@@ -517,6 +518,9 @@ foreach::registerDoSEQ()
 names(sentiment) <- c("TSLA", "GOOG")
 
 ggplot2::ggplot(sentiment, ggplot2::aes(x = Date, y = Sentiment, color = Ticker)) + ggplot2::geom_line() + ggplot2::ggtitle("Twitter Sentiment Over Time")
+
+
+
 ```
 
 ### 5 - PCA Regression
