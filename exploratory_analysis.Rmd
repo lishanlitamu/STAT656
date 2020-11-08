@@ -16,11 +16,13 @@ library(bit64) # To read raw data
 library(caret)
 library(corrplot)
 library(data.table) # Faster CSV reader than base
+library(doParallel)
 library(dplyr)
 library(e1071)
 library(ggplot2) # General plotting
 library(GuardianR) # Guardian API scrape
 library(newsanchor) # News API scrape
+library(parallel)
 library(readxl)
 library(rtweet) # Twitter scrape
 library(rvest)
@@ -377,7 +379,7 @@ api_key <- "d02efa1b-b4a4-4e20-a7f5-eee62d80cbf6"
 
 ## Query Guardian for TSLA news
 tsla_news <- GuardianR::get_guardian("Tesla", section = base::c("business", "technology", 
-                                                                   "money", "world"), 
+                                                                "money", "world"), 
                                      from.date = "2015-10-02", to.date = "2020-09-01", api.key = api_key)
 tsla_news <- tsla_news[, 4:5] # Extract relevant columns only
 
@@ -439,6 +441,17 @@ for (row in 1:base::nrow(goog_news)) {
   }
   goog_news[row, ]$Sentiment <- sentiment
 }
+
+goog_news$Ticker <- "GOOG"
+tsla_news$Ticker <- "TSLA"
+plot_data <- dplyr::bind_rows(goog_news, tsla_news)
+mu <- plyr::ddply(plot_data, "Ticker", summarise, grp.mean = mean(Sentiment))
+ggplot2::ggplot(data = plot_data, ggplot2::aes(x = Sentiment, fill = Ticker)) + 
+  ggplot2::geom_density(alpha = 0.5) + 
+  ggplot2::geom_vline(data = mu, ggplot2::aes(xintercept = grp.mean, color = Ticker),
+                      linetype = "dashed") +
+  ggplot2::scale_color_manual(values = c("#5f506b", "#86bbbd")) + 
+  ggplot2::scale_fill_manual(values = c("#5f506b", "#86bbbd"))
 ```
 
 ### 4 - Twitter Scraping
@@ -471,11 +484,12 @@ sentiment <- base::data.frame("Ticker" = base::character(),
 cl <- parallel::makeCluster(3, setup_strategy = "sequential")
 doParallel::registerDoParallel(cl)
 foreach(index = 1:2) %dopar% {
+  library(dplyr)
   tickers <- c("TSLA", "GOOG"); ticker <- tickers[index]
   
   ## Pull tweets (this will throw an authentication page the first time)
   search <- base::ifelse(ticker == "TSLA", "Tesla", "Google")
-  tweets <- rtweet::search_tweets(q = search, n = 10000, include_rts = F,
+  tweets <- rtweet::search_tweets(q = search, n = 1000, include_rts = F,
                                   retryonratelimit = T)
 
   ## Check sentiment
