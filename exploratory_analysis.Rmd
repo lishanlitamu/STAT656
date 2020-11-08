@@ -40,7 +40,7 @@ library(vip)      #Variable importance, lecture 27
 library(glmnet)   #Elastic net regression
 #library(keras)    #Neural Networks
 #library(tensorflow)
-
+library(foreach)
 
 knitr::opts_chunk$set(echo = T)
 ```
@@ -754,7 +754,7 @@ googAddK = googAddSMA %>%
 
 ```
 
-### Moving Average Convergence Divergence
+Moving Average Convergence Divergence
 ```{r MACD}
 ###TSLA
 daysMACDslow   = 26 #default nSlow
@@ -969,8 +969,8 @@ addDiffVarF = function(dataForModification,nColumn) {
 
 #tslaAddDiff =  addDiffVarF(tslaSelected,ncol(tslaSelected))
 ``` 
-#A few added indicators represent moving average of price or volume in a past designated period. Hence, we probably don't need to include lagged values. 
-#### Probably delete above codes later ##################
+A few added indicators represent moving average of price or volume in a past designated period. Hence, we probably don't need to include lagged values. 
+Probably delete above codes later ##################
 
 Up till now, we added xx stock indicators:
 `r names(beforeAfterVar)`
@@ -1188,7 +1188,7 @@ ggplot(data = pcaGoogX)+
 
 ```
 
-####Linear Model
+##### 5.2 Linear Model
 ```{r dummyVarForLogisticRegression}
 #hist(tslaReg$stockReturn, breaks=20, freq=FALSE,main = paste("Density Plot - ",names(tslaReg$stockReturn)),xlab = " ") # stock return is normally distributed.
 
@@ -1453,7 +1453,7 @@ glmnetOutGoog = glmnet::glmnet(x = as.matrix(XgoogLinearReg), y = YgoogLinearReg
 
 ```
 
-####Nonlinear Model
+##### 5.3 Nonlinear Model (MARS)
 
 ```{r dataSplit}
 set.seed(2020)
