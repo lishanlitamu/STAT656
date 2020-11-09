@@ -41,6 +41,7 @@ library(glmnet)   #Elastic net regression
 #library(keras)    #Neural Networks
 #library(tensorflow)
 library(foreach)
+library(kknn) #knn regression
 
 knitr::opts_chunk$set(echo = T)
 ```
@@ -242,6 +243,11 @@ plot3D::scatter3D(tslaPCA$PC1, tslaPCA$PC2, tslaPCA$PC3, pch = 16,
                   ylab ="PC2", zlab = "PC3", bty = "g", ticktype = "detailed")
 
 ```
+
+
+
+
+
 
 #### Fig. 2.1 Density Plots  - Tesla
 ```{r dataPlotsTsla, echo=FALSE}
@@ -1160,13 +1166,12 @@ YtslaLinearReg = tslaYyeoJ %>%
 #Linear regression when Supervisor = diffHighLowTomorrow
 lmOutTslaDiffHighLow = train(x = XtslaLinearReg, y = YtslaLinearReg$diffHighLowTomorrow, method = "lm", trControl = trControl)
 
-lmOutTslaDiffHighLow
+summary(lmOutTslaDiffHighLow)
 
 #Linear regression when Supervisor = StockReturn
 lmOutTslaStockReturn = train(x = XtslaLinearReg, y = YtslaLinearReg$stockReturnTomorrow, method = "lm", trControl = trControl)
 
-lmOutTslaStockReturn
-
+summary(lmOutTslaStockReturn)
 
 
 
@@ -1206,12 +1211,15 @@ YgoogLinearReg = googYyeoJ %>%
 #Linear regression when Supervisor = diffHighLowTomorrow
 lmOutGoogDiffHighLow = train(x = XgoogLinearReg, y = YgoogLinearReg$diffHighLowTomorrow, method = "lm", trControl = trControl)
 
-lmOutGoogDiffHighLow
+summary(lmOutGoogDiffHighLow)
 
 #Linear regression when Supervisor = StockReturn
 lmOutGoogStockReturn = train(x = XgoogLinearReg, y = YgoogLinearReg$stockReturnTomorrow, method = "lm", trControl = trControl)
 
-lmOutGoogStockReturn
+summary(lmOutGoogStockReturn)
+
+
+
 ```
 
 ```{r linearRegPenalized}
@@ -1297,7 +1305,47 @@ glmnetOutGoog = glmnet::glmnet(x = as.matrix(XgoogLinearReg), y = YgoogLinearReg
 
 
 
-##### 5.4 PCA regression
+##### 5.3 PCA regression
+
+```{r calculatePCA}
+#use data crearted in {r assignYandX}
+
+###TSLA
+#It's suggested to use only quantitative variables in PCA regression
+#Transform the selected data
+tslaTrans = caret::preProcess(tslaX, method = c("BoxCox","center","scale","pca"))
+tslaTrans = caret::preProcess(as.data.frame(tslaX), method = c("BoxCox","center","scale","pca"))
+
+#Apply the transformations("BoxCox","center","scale","pca")
+tslaPCA = stats::predict(tslaTrans,as.data.frame(tslaX)) #Outputs are PCA components
+#utils::head(tslaPCA)
+
+#Summary of PCA results
+tslaTrans_     = caret::preProcess(as.data.frame(tslaX), method = c("BoxCox","center","scale"))
+propVarTslaPCA = as.data.frame(tslaX) %>%
+                 stats::predict(tslaTrans_,.) %>%
+                 stats::prcomp() %>%
+                 summary()
+#propVarTslaPCA #proportion of variance explained by each PCs
+
+
+#Transform the selected data
+googTrans = caret::preProcess(as.data.frame(googX), method = c("BoxCox","center","scale","pca"))
+
+#Apply the transformations("BoxCox","center","scale","pca")
+googPCA = stats::predict(googTrans,as.data.frame(googX)) #Outputs are PCA components
+#utils::head(googPCA)
+
+#Summary of PCA results
+googTrans_    = caret::preProcess(as.data.frame(googX), method = c("BoxCox","center","scale"))
+propVarGoogPCA = as.data.frame(googX) %>%
+                 stats::predict(googTrans_,.) %>%
+                 stats::prcomp() %>%
+                 summary()
+#propVarGoogPCA #proportion of variance explained by each PCs
+
+```
+
 ```{r dataSplitPCA}
 #use data crearted in {r assignYandX}
 set.seed(2022)
@@ -1314,11 +1362,11 @@ YtslaTest_SR       = tslaY$stockReturnTomorrow [-trainIndexSR_Tsla]
 YtslaTest_SRDummy  = tslaY$stockReturnTomorrowDummy[-trainIndexSR_Tsla]
 
 
-XtslaTrain_HL = tslaX[trainIndexHL_Tsla,] 
-XtslaTest_HL  = tslaX[-trainIndexHL_Tsla,]
+XtslaTrain_HL = tslaPCA[trainIndexHL_Tsla,] 
+XtslaTrain_SR = tslaPCA[trainIndexSR_Tsla,] 
 
-XtslaTrain_SR = tslaX[trainIndexSR_Tsla,] 
-XtslaTest_SR  = tslaX[-trainIndexSR_Tsla,]
+XtslaTest_HL  = tslaPCA[-trainIndexHL_Tsla,]
+XtslaTest_SR  = tslaPCA[-trainIndexSR_Tsla,]
 
 
 ###GOOG
@@ -1327,190 +1375,82 @@ set.seed(2020)
 trainIndexHL_Goog = caret::createDataPartition(googY$diffHighLowTomorrow, p = 0.25, list = FALSE)
 trainIndexSR_Goog = caret::createDataPartition(googY$stockReturnTomorrow, p = 0.25, list = FALSE)
 
-YgoogTrain_HL      = tslaY$diffHighLowTomorrow[trainIndexHL_Goog]
-YgoogTrain_SR      = tslaY$stockReturnTomorrow[trainIndexSR_Goog]
-YgoogTrain_SRDummy = tslaY$stockReturnTomorrowDummy[trainIndexSR_Goog]
+YgoogTrain_HL      = googY$diffHighLowTomorrow[trainIndexHL_Goog]
+YgoogTrain_SR      = googY$stockReturnTomorrow[trainIndexSR_Goog]
+YgoogTrain_SRDummy = googY$stockReturnTomorrowDummy[trainIndexSR_Goog]
 
-YgoogTest_HL       = tslaY$diffHighLowTomorrow[-trainIndexHL_Goog]
-YgoogTest_SR       = tslaY$stockReturnTomorrow[-trainIndexSR_Goog]
-YgoogTest_SRDummy  = tslaY$stockReturnTomorrowDummy[-trainIndexSR_Goog]
+YgoogTest_HL       = googY$diffHighLowTomorrow[-trainIndexHL_Goog]
+YgoogTest_SR       = googY$stockReturnTomorrow[-trainIndexSR_Goog]
+YgoogTest_SRDummy  = googY$stockReturnTomorrowDummy[-trainIndexSR_Goog]
 
 
-XgoogTrain_HL = tslaX[trainIndexHL_Goog,] 
-XgoogTest_HL  = tslaX[-trainIndexHL_Goog,]
+XgoogTrain_HL = googPCA[trainIndexHL_Goog,] 
+XgoogTrain_SR = googPCA[trainIndexSR_Goog,] 
 
-XgoogTrain_SR = tslaX[trainIndexSR_Goog,] 
-XgoogTest_SR  = tslaX[-trainIndexSR_Goog,]
+XgoogTest_HL  = googPCA[-trainIndexHL_Goog,]
+XgoogTest_SR  = googPCA[-trainIndexSR_Goog,]
 
 ```
+
 
 ```{r PCA Regression}
-#use data crearted in {r assignYandX}
-
 ###TSLA
-#It's suggested to use only quantitative variables in PCA regression
-#Transform the selected data
+#YtslaTrain_HL      #Y1
+#YtslaTrain_SR      #Y2
+#YtslaTrain_SRDummy #Y3 #logistic regression
+#XtslaTrain_HL      #X1
+#XtslaTrain_SR      #X2
+#XtslaTrain_SR      #X3
 
-#Supervisor = diffHighLowTomorrow
-(tslaXTransTrain_HL = caret::preProcess(as.data.frame(XtslaTrain_HL), method = c("BoxCox","center","scale","pca")))
+Ktsla = 10
+cvIndexTsla = caret::createFolds(YtslaTrain_HL, k = Ktsla, returnTrain = TRUE)
+trControl = trainControl(method = "cv", index = cvIndexTsla)
+lmOutTslaHL_PCA = train(x = XtslaTrain_HL, y = YtslaTrain_HL, 
+                        method = "lm", trControl = trControl)
+summary(lmOutTslaHL_PCA)
+YtslaHL_pred    = predict(lmOutTslaHL_PCA,XtslaTest_HL)
+residTslaHL     = YtslaHL_pred - YtslaTest_HL
+plot(YtslaTest_HL, residTslaHL, main = "Residuals vs predicted_diffHighLowTsla")
 
-#Apply the transformations("BoxCox","center","scale","pca")
-pcaTslaXTrain_HL = stats::predict(tslaXTransTrain_HL,as.data.frame(XtslaTrain_HL)) #Outputs are PCA components
-#head(pcaTslaX)
-
-#Summary of PCA results
-tslaXTransTrain_HL_       = caret::preProcess(as.data.frame(XtslaTrain_HL), method = c("BoxCox","center","scale"))
-propVar_pcaTslaXTrain_HL_ = as.data.frame(XtslaTrain_HL) %>%
-                 stats::predict(tslaXTransTrain_HL_,.) %>%
-                 stats::prcomp() %>%
-                 summary()
-propVar_pcaTslaXTrain_HL_ #proportion of variance explained by each PCs
-
-#Supervisor = stockReturnTomorrow
-(tslaXTransTrain_HL = caret::preProcess(as.data.frame(XtslaTrain_HL), method = c("BoxCox","center","scale","pca")))
-
-#Apply the transformations("BoxCox","center","scale","pca")
-pcaTslaXTrain_HL = stats::predict(tslaXTransTrain_HL,as.data.frame(XtslaTrain_HL)) #Outputs are PCA components
-#head(pcaTslaX)
-
-#Summary of PCA results
-tslaXTransTrain_HL_       = caret::preProcess(as.data.frame(XtslaTrain_HL), method = c("BoxCox","center","scale"))
-propVar_pcaTslaXTrain_HL_ = as.data.frame(XtslaTrain_HL) %>%
-                 stats::predict(tslaXTransTrain_HL_,.) %>%
-                 stats::prcomp() %>%
-                 summary()
-propVar_pcaTslaXTrain_HL_ #proportion of variance explained by each PCs
-
+Ktsla = 10
+cvIndexTsla = caret::createFolds(YtslaTrain_SR, k = Ktsla, returnTrain = TRUE)
+trControl = trainControl(method = "cv", index = cvIndexTsla)
+lmOutTslaSR_PCA = train(x = XtslaTrain_SR, y = YtslaTrain_SR, 
+                        method = "lm", trControl = trControl)
+summary(lmOutTslaSR_PCA)
+YtslaSR_pred    = predict(lmOutTslaSR_PCA,XtslaTest_SR)
+residTslaSR     = YtslaSR_pred - YtslaTest_SR
+plot(YtslaTest_SR, residTslaSR, main = "Residuals vs predicted_stockReturnTsla")
 
 ###GOOG
+#YgoogTrain_HL      #Y1
+#YgoogTrain_SR      #Y2
+#YgoogTrain_SRDummy #Y3 
+#XgoogTrain_HL      #X1
+#XgoogTrain_SR      #X2
+#XgoogTrain_S       #X3
 
-#Transform the selected data
-(googXTrans = caret::preProcess(as.data.frame(googX), method = c("BoxCox","center","scale","pca")))
+Kgoog = 10
+cvIndexGoog     = caret::createFolds(YgoogTrain_HL, k = Kgoog, returnTrain = TRUE)
+trControl       = trainControl(method = "cv", index = cvIndexGoog)
+lmOutGoogHL_PCA = train(x = XgoogTrain_HL, y = YgoogTrain_HL, 
+                        method = "lm", trControl = trControl)
+summary(lmOutGoogHL_PCA)
+YgoogHL_pred    = predict(lmOutGoogHL_PCA,XgoogTest_HL)
+residGoogHL     = YgoogHL_pred - YgoogTest_HL
+plot(YgoogTest_HL, residGoogHL, main = "Residuals vs predicted_diffHighLowGoog")
 
-#Apply the transformations("BoxCox","center","scale","pca")
-pcaGoogX = stats::predict(googXTrans,as.data.frame(googX)) #Outputs are PCA components
-#head(pcaTslaX)
-
-#Summary of PCA results
-googXTrans_     = caret::preProcess(as.data.frame(googX), method = c("BoxCox","center","scale"))
-propVar_pcaGoogX = as.data.frame(googX) %>%
-                 stats::predict(googXTrans_,.) %>%
-                 stats::prcomp() %>%
-                 summary()
-propVar_pcaGoogX #proportion of variance explained by each PCs
-
-#Check extreme observations via PCA
-
-ggplot(data = pcaGoogX)+
-  geom_point(aes(x = PC1, y= PC2))
-
-ggplot(data = pcaGoogX)+
-  geom_point(aes(x = PC3, y= PC2))
-
-ggplot(data = pcaGoogX)+
-  geom_point(aes(x = PC1, y= PC3))
-
-plot3D::scatter3D(pcaGoogX$PC1, pcaGoogX$PC2, pcaGoogX$PC3, pch = 16,  
-                  theta = 20, phi = 20, main = "PCA - GOOG", xlab = "PC1", 
-                  ylab ="PC2", zlab = "PC3", bty = "g", ticktype = "detailed")
-#Two or a few more outliers. 
-
-##diffHighLow vs PCs
-# PC1 (better result for classification)
-ggplot(data = pcaGoogX)+
-  geom_point(aes(x = PC1, y=googY$diffHighLowTomorrow), color=ifelse(googY$diffHighLowTomorrow > mean(googY$diffHighLowTomorrow),"red", "blue"))
-
-ggplot(data = pcaGoogX)+
-  geom_point(aes(x = PC1, y=googY$diffHighLowTomorrow)
-, color=ifelse(googX$diffHighLow > mean(googX$diffHighLow),"red", "blue"))
-
-# PC2 (impossible to classify Y)
-ggplot(data = pcaGoogX)+
-  geom_point(aes(x = PC2, y=googY$diffHighLowTomorrow), color=ifelse(googY$diffHighLowTomorrow > mean(googY$diffHighLowTomorrow),"red", "blue"))
-
-ggplot(data = pcaGoogX)+
-  geom_point(aes(x = PC2, y=googY$diffHighLowTomorrow)
-, color=ifelse(googX$diffHighLow > mean(googX$diffHighLow),"red", "blue"))
-
-# PC3 (impossible to classify Y)
-ggplot(data = pcaGoogX)+
-  geom_point(aes(x = PC3, y=googY$diffHighLowTomorrow)
-             , color=ifelse(googY$diffHighLowTomorrow > mean(googY$diffHighLowTomorrow),"red", "blue"))
-
-ggplot(data = pcaGoogX)+
-  geom_point(aes(x = PC3, y=googY$diffHighLowTomorrow)
-, color=ifelse(googX$diffHighLow > mean(googX$diffHighLow),"red", "blue"))
-
-# 3D Plot(PC1, PC3, diffHighLowTomorrow)
-
-############################!!!!!!!!!!add legends for colors
-scatterplot3d::scatterplot3d(x = pcaGoogX$PC1, y = pcaGoogX$PC2,
-                             z = googY$diffHighLowTomorrow, pch = 16, color = ifelse(googY$diffHighLowTomorrow > mean(googY$diffHighLowTomorrow),"red", "blue"))
-
-############################!!!!!!!!!!add legends for colors
-scatterplot3d::scatterplot3d(x = pcaGoogX$PC1, y = pcaGoogX$PC2,
-                             z = googY$diffHighLowTomorrow, pch = 16, color = ifelse(googX$diffHighLow > mean(googX$diffHighLow),"red", "blue"))
-
-
-##stockReturn vs PCs
-# PC1 (Impossible to classify Y)
-ggplot(data = pcaGoogX)+
-  geom_point(aes(x = PC1, y=googY$stockReturnTomorrow), color=ifelse(googX$stockReturn > mean(googX$stockReturn),"red", "blue"))
-
-# PC2 (Better)
-ggplot(data = pcaGoogX)+
-  geom_point(aes(x = PC2, y=googY$stockReturnTomorrow), color=ifelse(googX$stockReturn > mean(googX$stockReturn),"red", "blue"))
-# PC3 (Better)
-ggplot(data = pcaGoogX)+
-  geom_point(aes(x = PC3, y=googY$stockReturnTomorrow), color=ifelse(googX$stockReturn > mean(googX$stockReturn),"red", "blue"))
-
+Kgoog = 10
+cvIndexGoog     = caret::createFolds(YgoogTrain_SR, k = Kgoog, returnTrain = TRUE)
+trControl       = trainControl(method = "cv", index = cvIndexGoog)
+lmOutGoogSR_PCA = train(x = XgoogTrain_SR, y = YgoogTrain_SR, 
+                        method = "lm", trControl = trControl)
+summary(lmOutGoogSR_PCA)
+YgoogSR_pred    = predict(lmOutGoogSR_PCA,XgoogTest_SR)
+residGoogSR     = YgoogSR_pred - YgoogTest_SR
+plot(YgoogTest_SR, residGoogSR, main = "Residuals vs predicted_stockReturnGoog")
 ```
 
-##### 5.3 Nonlinear Model (KNN)
-
-```{r knnRegression_PCA}
-###TSLA
-
-
-
-
-###GOOG
-
-
-```
-```{r knnClassification_PCA}
-
-###TSLA
-#Supervisor = diffHighLowTomorrow
-tuneGridTslaKNN = expand.grid(k = c(1,2,3,4,5,10,20,30,40,50))
-knnOutTsla = train(x = pcaTslaX[,1:5], y = tslaY$diffHighLowTomorrow,
-                   method = "knn",
-                   tuneGrid = tuneGridTslaKNN,
-                   trControl = trainControl(method = 'cv', number = 10))
-k_TslaKNN = knnOutTsla$finalModel$k
-
-knnOutTsla$results$Rsquared
-knnOutTsla$results$RMSE
-
-tslaKNNTest
-
-#Supervisor = stockReturnTomorrow
-#tuneGridTslaKNN = expand.grid(k = c(1,2,10,50,100,180))
-knnOutTsla = train(x = pcaTslaX[,1:5], y = tslaY$stockReturnTomorrow,
-                   method = "knn",
-                   tuneGrid = tuneGridTslaKNN,
-                   trControl = trainControl(method = 'cv', number = 10))
-
-diffHighLowTomorrowPred = predict(knnOutTsla, pcaTslaX[,1:5])
-residTslaKNN_HL = tslaY$diffHighLowTomorrow - diffHighLowTomorrowPred
-plot(tslaY$diffHighLowTomorrow, residTslaKNN_HL)
-
-
-
-###GOOG
-
-
-```
 
 
 
@@ -1771,7 +1711,6 @@ plot(marsVipGoogHL)
 ```
 
 
-
 ``` {r summary(MARS vs MLR vs ElasticNet}
 #Overall Comparisons of results from previous section
 
@@ -1917,6 +1856,101 @@ hclustPlotF(XtslaNNScaled)
 #confusion matrix
 
 ```
+
+##### 5.5 Nonlinear Model (KNN)
+
+```{r knnRegression_PCA}
+###TSLA
+tuneGridTslaKNNReg = data.frame('kmax' = 10,
+                             'distance' = 2,
+                             'kernel' = 'optimal')
+knnRegOutTsla  = train(x = XtslaTrain_HL[,1:5], y = YtslaTrain_HL,
+                       method = "kknn", tuneGrid = tuneGridTslaKNNReg,
+                       trControl = trainControl(method = 'cv', number = 10))
+summary(knnRegOutTsla)
+
+YtslaKNNReg_pred = predict(knnRegOutTsla, XtslaTest_HL[,1:5], 
+                           k = knnRegOutTsla$finalModel$best.parameters$k)
+resid_YtslaKNNReg = YtslaKNNReg_pred - YtslaTest_HL
+plot(YtslaTest_HL,resid_YtslaKNNReg)
+###GOOG
+tuneGridGoogKNNReg = data.frame('kmax' = 10,
+                             'distance' = 2,
+                             'kernel' = 'optimal')
+knnRegOutGoog  = train(x = XgoogTrain_HL[,1:5], y = YgoogTrain_HL,
+                       method = "kknn", tuneGrid = tuneGridGoogKNNReg,
+                       trControl = trainControl(method = 'cv', number = 10))
+summary(knnRegOutGoog)
+
+YgoogKNNReg_pred = predict(knnRegOutGoog, XgoogTest_HL[,1:5], 
+                           k = knnRegOutGoog$finalModel$best.parameters$k)
+resid_YgoogKNNReg = YgoogKNNReg_pred - YgoogTest_HL
+plot(YgoogTest_HL,resid_YgoogKNNReg)
+
+```
+```{r knnClassification_PCA}
+
+###TSLA
+
+#Supervisor = stockReturnTomorrowDummuy
+tuneGridTslaKNN = expand.grid(k = c(1,2,10,50,100,180))
+knnOutTsla = train(x = XtslaTrain_SR[,1:5], y = as.factor(YtslaTrain_SRDummy),
+                   method = "knn",
+                   tuneGrid = tuneGridTslaKNN,
+                   trControl = trainControl(method = 'cv', number = 10))
+
+knnOutTsla$finalModel$k
+summary(knnOutTsla)
+
+plot(knnOutTsla$results$Accuracy, xlab = "#Neighbors")
+
+YtslaDummyKNN_pred = predict(knnOutTsla, XtslaTest_SR, k = 1)
+correctYtslaDummyKNN = ifelse(YtslaDummyKNN_pred == YtslaTest_SR, 1, 0)
+
+
+###GOOG
+#Supervisor = stockReturnTomorrowDummuy
+tuneGridGoogKNN = expand.grid(k = c(1,2,10,50,100,180))
+knnOutGoog = train(x = XgoogTrain_SR[,1:5], y = as.factor(YgoogTrain_SRDummy),
+                   method = "knn",
+                   tuneGrid = tuneGridGoogKNN,
+                   trControl = trainControl(method = 'cv', number = 10))
+
+knnOutGoog$finalModel$k
+summary(knnOutGoog)
+plot(knnOutGoog$results$Accuracy, xlab = "#Neighbors")
+
+```
+
+
+```{r knnRegression_VIP}
+#use {mars} data splits
+###TSLA
+xTslaTrainVIP = XtslaTrain %>%
+  select(c(afterHourDiffPriceRatio,smaVolume,obv,PROF_MARGIN,increaseTrend))
+xTslaTestVIP  = XtslaTest  %>%
+  select(c(afterHourDiffPriceRatio,smaVolume,obv,PROF_MARGIN,increaseTrend))
+
+tuneGridTslaKNNReg = data.frame('kmax' = 10,
+                             'distance' = 2,
+                             'kernel' = 'optimal')
+knnRegOutTslaVIP  = train(x = xTslaTrainVIP, y = YtslaTrain_DiffHighLow,
+                       method = "kknn", tuneGrid = tuneGridTslaKNNReg,
+                       trControl = trainControl(method = 'cv', number = 10))
+summary(knnRegOutTslaVIP)
+
+YtslaKNNRegVIP_pred = predict(knnRegOutTslaVIP, xTslaTestVIP, 
+                           k = knnRegOutTslaVIP$finalModel$best.parameters$k)
+resid_YtslaKNNRegVIP = YtslaKNNRegVIP_pred - YtslaTest_DiffHighLow
+plot(YtslaTest_DiffHighLow,resid_YtslaKNNRegVIP)
+###GOOG
+```
+
+```{r knnClassification_VIP}
+
+```
+
+
 
 ##### 6 - Neural Networks
 ```{r scatterPlots}
