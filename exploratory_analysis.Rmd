@@ -1069,6 +1069,9 @@ XtslaWithDummy = tslaX %>%
   mutate(XtslaDummy) %>% 
   dplyr::select(-R1,-S1,-R2,-S2,-R3,-S3)
 
+XtslaWithoutDummy = tslaX %>%
+  dplyr::select(-R1,-S1,-R2,-S2,-R3,-S3)
+
 YtslaWithDummy = tslaY %>% mutate(YtslaDummy) 
 
 
@@ -1102,6 +1105,9 @@ googFullWithDummy = googFull %>%
 
 XgoogWithDummy = googX %>%
   mutate(XgoogDummy) %>% 
+  dplyr::select(-R1,-S1,-R2,-S2,-R3,-S3)
+
+XgoogWithoutDummy = googX %>%
   dplyr::select(-R1,-S1,-R2,-S2,-R3,-S3)
 
 YgoogWithDummy = googY %>% mutate(YgoogDummy) 
@@ -1172,9 +1178,6 @@ summary(lmOutTslaDiffHighLow)
 lmOutTslaStockReturn = train(x = XtslaLinearReg, y = YtslaLinearReg$stockReturnTomorrow, method = "lm", trControl = trControl)
 
 summary(lmOutTslaStockReturn)
-
-
-
 
 
 
@@ -1986,9 +1989,9 @@ tensorflow.keras
 ####TSLA
 #Feature transformations
 #First, standardize all numeric features
-tslaXStandardized = tslaX %>% #tslaX contains only numeric features
+tslaXStandardized = XtslaWithoutDummy %>% #tslaX contains only numeric features
   caret::preProcess(method = c("center","scale")) %>%
-  predict(newdata = tslaX)
+  predict(newdata = XtslaWithoutDummy)
 
 XtslaStandardizedWithDummy = tslaXStandardized %>%
   cbind(.,XtslaDummy) #add dummy variables back to data set
@@ -1999,7 +2002,6 @@ YtslaStandardizedWithDummy = tslaYnumeric %>%
   predict(newdata = tslaYnumeric) %>%
   cbind(.,YtslaDummy) #add dummy variables back to data set
 
-  
 highCorrTsla = highCorrF(XtslaStandardizedWithDummy,0.8)
 XtslaLinear = XtslaStandardizedWithDummy %>% select(-highCorrTsla)
         #Standardized, WithDummy, RemoveCorr
@@ -2007,9 +2009,9 @@ XtslaLinear = XtslaStandardizedWithDummy %>% select(-highCorrTsla)
 ####GOOG
 #Feature transformations
 #First, standardize all numeric features
-googXStandardized = googX %>% #tslaX contains only numeric features
+googXStandardized = XgoogWithoutDummy %>% #tslaX contains only numeric features
   caret::preProcess(method = c("center","scale")) %>%
-  predict(newdata = googX)
+  predict(newdata = XgoogWithoutDummy)
 
 XgoogStandardizedWithDummy = googXStandardized %>%
   cbind(.,XgoogDummy) #add dummy variables back to data set
@@ -2025,6 +2027,10 @@ highCorrGoog = highCorrF(XgoogStandardizedWithDummy,0.8)
 XgoogLinear = XgoogStandardizedWithDummy %>% select(-highCorrGoog)
         #Standardized, WithDummy, RemoveCorr
 
+#XtslaStandardizedWithDummy
+#YtslaStandardizedWithDummy
+#XgoogStandardizedWithDummy
+#YgoogStandardizedWithDummy
 ```
 
 ```{r dataSplitTask3}
@@ -2052,15 +2058,14 @@ Ytest_tslaSR  = YtslaStandardizedWithDummy$stockReturnTomorrow[-inTrain_tslaSR]
 Ytrain_tslaSRdummy = YtslaStandardizedWithDummy$stockReturnTomorrowDummy[inTrain_tslaSRdummy]
 Ytest_tslaSRdummy  = YtslaStandardizedWithDummy$stockReturnTomorrowDummy[-inTrain_tslaSRdummy]
 
-Xtrain_tslaHL = XtslaStandardizedWithDummy[inTrain_tslaHL,]
+Xtrain_tslaHL = XtslaStandardizedWithDummy[inTrain_tslaHL,] 
 Xtest_tslaHL  = XtslaStandardizedWithDummy[-inTrain_tslaHL,]
-Xtrain_tslaSR = XtslaStandardizedWithDummy[inTrain_tslaSR,]
+Xtrain_tslaSR = XtslaStandardizedWithDummy[inTrain_tslaSR,] 
 Xtest_tslaSR  = XtslaStandardizedWithDummy[-inTrain_tslaSR,]
 Xtrain_tslaSRdummy = XtslaStandardizedWithDummy[inTrain_tslaSRdummy,]
 Xtest_tslaSRdummy  = XtslaStandardizedWithDummy[-inTrain_tslaSRdummy,]
 
 ###GOOG
-set.seed(2021)
 inTrain_googHL = caret::createDataPartition(YgoogStandardizedWithDummy$diffHighLowTomorrow, p = 3/4, list = FALSE) #Y1
 inTrain_googSR = caret::createDataPartition(YgoogStandardizedWithDummy$stockReturnTomorrow, p = 3/4, list = FALSE) #Y2
 inTrain_googSRdummy = caret::createDataPartition(YgoogStandardizedWithDummy$stockReturnTomorrowDummy, p = 3/4, list = FALSE) #Y3
@@ -2154,25 +2159,144 @@ doParallel::registerDoParallel(cl)
 ```
 
 
-```{r linearTask3}
+```{r linearTunningParameters}
 set.seed(2020)
+
+####Supervisor Y1 = YtslaStandardizedWithDummy$diffHighLowTomorrow
+####TSLA
 #trControl = caret::trainControl(method = "repeatedcv", repeats = 2, number = 10)
 
-lassoGridTsla = expand.grid(lambda = c(0.0001,0.001, 0.01, 0.05, 0.1, 0.2),
+lassoGridTslaHL = expand.grid(lambda = c(0.0001,0.001, 0.01, 0.05, 0.1, 0.2),
                             alpha = c(0.05,0.5,1))
 
 
-elasticOutTsla = train(x = XtrainMat_tslaHL, y = Ytrain_tslaHL, 
+elasticOutTslaHL = train(x = XtrainMat_tslaHL, y = Ytrain_tslaHL, 
                        method = 'glmnet',
-                       tuneGrid = lassoGridTsla, 
+                       tuneGrid = lassoGridTslaHL, 
                        trControl = trControl)
-plot(elasticOutTsla)
+plot(elasticOutTslaHL)
+
+####GOOG
+#trControl = caret::trainControl(method = "repeatedcv", repeats = 2, number = 10)
+
+lassoGridGoogHL = expand.grid(lambda = c(0.0001,0.001, 0.01, 0.05, 0.1, 0.2),
+                            alpha = c(0.05,0.5,1))
+
+
+elasticOutGoogHL = train(x = XtrainMat_googHL, y = Ytrain_googHL, 
+                       method = 'glmnet',
+                       tuneGrid = lassoGridGoogHL, 
+                       trControl = trControl)
+plot(elasticOutGoogHL)
+
+
+
+####Supervisor Y2 = YtslaStandardizedWithDummy$stockReturnTomorrow
+####TSLA
+#trControl = caret::trainControl(method = "repeatedcv", repeats = 2, number = 10)
+
+lassoGridTslaSR = expand.grid(lambda = c(0.0001,0.001, 0.01, 0.05, 0.1, 0.2),
+                            alpha = c(0.05,0.5,1))
+
+
+elasticOutTslaSR = train(x = XtrainMat_tslaSR, y = Ytrain_tslaSR, 
+                       method = 'glmnet',
+                       tuneGrid = lassoGridTslaSR, 
+                       trControl = trControl)
+plot(elasticOutTslaSR)
+
+####GOOG
+#trControl = caret::trainControl(method = "repeatedcv", repeats = 2, number = 10)
+
+lassoGridGoogSR = expand.grid(lambda = c(0.0001,0.001, 0.01, 0.05, 0.1, 0.2),
+                            alpha = c(0.05,0.5,1))
+
+
+elasticOutGoogSR = train(x = XtrainMat_googSR, y = Ytrain_googSR, 
+                       method = 'glmnet',
+                       tuneGrid = lassoGridGoogSR, 
+                       trControl = trControl)
+plot(elasticOutGoogSR)
+
+
+#List of turning parameters
+tunePara = rbind(
+  elasticOutTslaHL$bestTune,
+  elasticOutTslaSR$bestTune,
+  elasticOutGoogHL$bestTune,
+  elasticOutGoogSR$bestTune
+  )
+
+row.names(tunePara) = c("TSLA - diffHighLow", "TSLA - stockReturn",
+                "GOOG - diffHighLow", "GOOG - stockReturn")
+
+knitr::kable(
+ tunePara,
+ col.names = c("alpha","lambda"),
+ caption   = "Table 1: Optimal tuning parameters for linear regression",
+ align     = "lccrr"
+)
+
 ```
 
 
+```{r linearModelPenalized}
+####Supervisor Y1 = YtslaStandardizedWithDummy$diffHighLowTomorrow
+####TSLA
+glmnetOutTslaHL       = glmnet(x = XtrainMat_tslaHL, y = Ytrain_tslaHL, 
+                               alpha = elasticOutTslaHL$bestTune$alpha)
+betaHatGlmnetTslaHL   = coef(glmnetOutTslaHL, 
+                             s = elasticOutTslaHL$bestTune$lambda)
+YhatTrainGlmnetTslaHL = predict(glmnetOutTslaHL, XtrainMat_tslaHL, 
+                                s = elasticOutTslaHL$bestTune$lambda )
 
+residualsTslaHL = Ytrain_tslaHL - YhatTrainGlmnetTslaHL
+plot(YhatTrainGlmnetTslaHL, residualsTslaHL, 
+     xlab = "Traning predictions - TSLA diffHighLow",
+     ylab = "Residuals")
 
+####GOOG
+glmnetOutGoogHL       = glmnet(x = XtrainMat_googHL, y = Ytrain_googHL, 
+                               alpha = elasticOutGoogHL$bestTune$alpha)
+betaHatGlmnetGoogHL   = coef(glmnetOutGoogHL, 
+                             s = elasticOutGoogHL$bestTune$lambda)
+YhatTrainGlmnetGoogHL = predict(glmnetOutGoogHL, XtrainMat_googHL, 
+                                s = elasticOutGoogHL$bestTune$lambda )
 
+residualsGoogHL = Ytrain_googHL - YhatTrainGlmnetGoogHL
+plot(YhatTrainGlmnetGoogHL, residualsGoogHL, 
+     xlab = "Traning predictions - GOOG diffHighLow",
+     ylab = "Residuals")
+
+####Supervisor Y2 = YtslaStandardizedWithDummy$stockReturnTomorrow
+####TSLA
+glmnetOutTslaSR       = glmnet(x = XtrainMat_tslaSR, y = Ytrain_tslaSR, 
+                               alpha = elasticOutTslaSR$bestTune$alpha)
+betaHatGlmnetTslaSR   = coef(glmnetOutTslaSR, 
+                             s = elasticOutTslaSR$bestTune$lambda)
+
+YhatTrainGlmnetTslaSR = predict(glmnetOutTslaSR, XtrainMat_tslaSR, 
+                                s = elasticOutTslaSR$bestTune$lambda)
+
+residualsTslaSR = Ytrain_tslaSR - YhatTrainGlmnetTslaSR
+plot(YhatTrainGlmnetTslaSR, residualsTslaSR, 
+     xlab = "Traning predictions - TSLA Stock Return",
+     ylab = "Residuals")
+
+####GOOG
+glmnetOutGoogSR       = glmnet(x = XtrainMat_googSR, y = Ytrain_googSR, 
+                               alpha = elasticOutGoogSR$bestTune$alpha)
+betaHatGlmnetGoogSR   = coef(glmnetOutGoogSR, 
+                             s = elasticOutGoogSR$bestTune$lambda)
+YhatTrainGlmnetGoogSR = predict(glmnetOutGoogSR, XtrainMat_googSR, 
+                                s = elasticOutGoogSR$bestTune$lambda )
+
+residualsGoogSR = Ytrain_googSR - YhatTrainGlmnetGoogSR
+plot(YhatTrainGlmnetGoogSR, residualsGoogSR, 
+     xlab = "Traning predictions - GOOG Stock Return",
+     ylab = "Residuals")
+
+```
 
 
 
