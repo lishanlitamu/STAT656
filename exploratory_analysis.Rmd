@@ -46,6 +46,9 @@ library(pROC) #ROC curve
 library(rpart) #tree
 library(microbenchmark) #randomforest
 library(xgboost) #boosting
+library(ranger)
+library(kernlab)
+
 knitr::opts_chunk$set(echo = T)
 ```
 
@@ -2547,7 +2550,7 @@ rfOut_tslaSRdummy  = train(x = XtrainMat_tslaSRdummy, y = Ytrain_tslaSRdummy,
 rfOut_tslaSRdummy$finalModel
 ```
 
-```{r classificationRandomForest}
+```{r boosting}
 set.seed(2020)
 ####TSLA
 #Y1
@@ -2579,10 +2582,11 @@ boostOutRandom_TslaSR = train(x = Xtrain_tslaSR, y = Ytrain_tslaSR,
                               tuneGrid = tuneGridRandom_TslaSR,
                               trControl = trControl)
 plot(boostOutRandom_TslaSR)
-
+boostOutRandom_TslaSR$bestTune$nrounds
 
 #Y3
-tuneGridRandom_TslaSRdummy = data.frame('nrounds'= c(50,150,500,1000,2000,3000),
+tuneGridRandom_TslaSRdummy = data.frame(
+                                   'nrounds'= c(50,150,500,1000,2000,3000,4000),
                                    'max_depth' = 6,
                                    'eta' = 0.05,
                                    'gamma' = 0,
@@ -2601,7 +2605,7 @@ plot(boostOutRandom_TslaSRdummy)
 
 ####GOOG
 #Y1
-tuneGridRandom_GoogHL = data.frame('nrounds'= c(50,150,500,1000,2000,3000),
+tuneGridRandom_GoogHL = data.frame('nrounds'= c(5,25,50,60,65,70,75,80,100),
                                    'max_depth' = 6,
                                    'eta' = 0.05,
                                    'gamma' = 0,
@@ -2616,7 +2620,7 @@ boostOutRandom_GoogHL = train(x = Xtrain_googHL, y = Ytrain_googHL,
 plot(boostOutRandom_GoogHL)
 
 #Y2
-tuneGridRandom_GoogSR = data.frame('nrounds'= c(50,150,500,1000,2000,3000),
+tuneGridRandom_GoogSR = data.frame('nrounds'= c(1,5,10,15,25,35,45,50,55,100),
                                    'max_depth' = 6,
                                    'eta' = 0.05,
                                    'gamma' = 0,
@@ -2624,15 +2628,16 @@ tuneGridRandom_GoogSR = data.frame('nrounds'= c(50,150,500,1000,2000,3000),
                                    'min_child_weight' = 0,
                                    'subsample' = 0.5)
 
-boostOutRandom_TslaSR = train(x = Xtrain_tslaSR, y = Ytrain_tslaSR,
+boostOutRandom_GoogSR = train(x = Xtrain_googSR, y = Ytrain_googSR,
                               method = 'xgbTree', verbose = 0,
-                              tuneGrid = tuneGridRandom_TslaSR,
+                              tuneGrid = tuneGridRandom_GoogSR,
                               trControl = trControl)
-plot(boostOutRandom_TslaSR)
-
+plot(boostOutRandom_GoogSR)
+boostOutRandom_GoogSR$bestTune$nrounds
 
 #Y3
-tuneGridRandom_TslaSRdummy = data.frame('nrounds'= c(50,150,500,1000,2000,3000),
+tuneGridRandom_GoogSRdummy = data.frame(
+                                   'nrounds'= c(50,1500,2000,3000,3500,4000),
                                    'max_depth' = 6,
                                    'eta' = 0.05,
                                    'gamma' = 0,
@@ -2640,24 +2645,54 @@ tuneGridRandom_TslaSRdummy = data.frame('nrounds'= c(50,150,500,1000,2000,3000),
                                    'min_child_weight' = 0,
                                    'subsample' = 0.5)
 
-boostOutRandom_TslaSRdummy = train(x = Xtrain_tslaSRdummy, 
-                                   y = Ytrain_tslaSRdummy_,
+boostOutRandom_GoogSRdummy = train(x = Xtrain_googSRdummy, 
+                                   y = Ytrain_googSRdummy_,
                               method = 'xgbTree', verbose = 0,
-                              tuneGrid = tuneGridRandom_TslaSRdummy,
+                              tuneGrid = tuneGridRandom_GoogSRdummy,
                               trControl = trControl)
-plot(boostOutRandom_TslaSRdummy)
+plot(boostOutRandom_GoogSRdummy)
 
 
 ```
 
 
 
-```{r regressionBoosting}
+```{r importanceBoosting}
+####TSLA
+(boostImportance_TslaHL = xgboost::xgb.importance(model = boostOutRandom_TslaHL$finalModel))
+
+(boostImportance_TslaSR = xgboost::xgb.importance(model = boostOutRandom_TslaSR$finalModel))
+
+(boostImportance_TslaSRdummy = xgboost::xgb.importance(model = boostOutRandom_TslaSRdummy$finalModel))
+
+####GOOG
+(boostImportance_GoogHL = xgboost::xgb.importance(model = boostOutRandom_GoogHL$finalModel))
+
+(boostImportance_GoogSR = xgboost::xgb.importance(model = boostOutRandom_GoogSR$finalModel))
+
+(boostImportance_GoogSRdummy = xgboost::xgb.importance(model = boostOutRandom_GoogSRdummy$finalModel))
 
 ```
 
-```{r classificationBoosting}
+```{r reviewFeatureImportance}
 
+rfImportance_TslaHL = rfOut_tslaHL$finalModel$variable.importance/sum(rfOut_tslaHL$finalModel$variable.importance)
+
+glmnetImportance_TslaHL = abs(betaHatGlmnetTslaHL[-1])/sum(abs(betaHatGlmnetTslaHL[-1]))
+
+colVec = rainbow(3)
+
+plot(1:10, rfImportance_TslaHL[1:10], xlab = " ",
+     xaxt = 'n', col = colVec[1], pch = 16, ylim = c(0, 0.5))
+points(1:10,glmnetImportance_TslaHL[1:10], col = colVec[2], pch = 17)
+points(1:10,boostImportance_TslaHL[1:10], col = colVec[3], pch = 18)
+axis(1, labels = names(Xtrain_tslaHL)[1:10], at = 1:ncol(Xtrain_tslaHL[,1:10]), las = 3)
+legend('topright', col = colVec, pch = 16:18, legend = c('rf','glmnet','boost'))
+
+boostImportance_TslaHL[1:10]
+names(Xtrain_tslaHL)[1:10]
+
+library()
 ```
 
 
