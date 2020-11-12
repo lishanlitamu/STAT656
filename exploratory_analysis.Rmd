@@ -2566,7 +2566,7 @@ boostOutRandom_TslaHL = train(x = Xtrain_tslaHL, y = Ytrain_tslaHL,
 plot(boostOutRandom_TslaHL)
 
 #Y2
-tuneGridRandom_TslaSR = data.frame('nrounds'= c(50,150,500,1000,2000,3000),
+tuneGridRandom_TslaSR = data.frame('nrounds'= c(1,5,10,15,25,35,45,50,55),
                                    'max_depth' = 6,
                                    'eta' = 0.05,
                                    'gamma' = 0,
@@ -2616,7 +2616,7 @@ boostOutRandom_GoogHL = train(x = Xtrain_googHL, y = Ytrain_googHL,
 plot(boostOutRandom_GoogHL)
 
 #Y2
-tuneGridRandom_TslaSR = data.frame('nrounds'= c(50,150,500,1000,2000,3000),
+tuneGridRandom_GoogSR = data.frame('nrounds'= c(50,150,500,1000,2000,3000),
                                    'max_depth' = 6,
                                    'eta' = 0.05,
                                    'gamma' = 0,
