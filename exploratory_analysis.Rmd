@@ -43,6 +43,9 @@ library(glmnet)   #Elastic net regression
 library(foreach)
 library(kknn) #knn regression
 library(pROC) #ROC curve
+library(rpart) #tree
+library(microbenchmark) #randomforest
+library(xgboost) #boosting
 knitr::opts_chunk$set(echo = T)
 ```
 
@@ -2339,10 +2342,53 @@ rocOut_TslaSRdummy = pROC::roc(response = Ytest_tslaSRdummy,
 
 plot(rocOut_TslaSRdummy)
 
+
+####GOOG
+set.seed(2020)
+K = 10
+trainControl = trainControl(method = 'cv', number = K)
+tuneGridGoogSRdummy = expand.grid('alpha' = c(0,.25,.5,.75,1),
+                                  'lambda' = seq(0.000001, .001, length.out = 30))
+elasticOutGoogSRdummy = train(x = Xtrain_googSRdummy, 
+                              y = as.factor(Ytrain_googSRdummy),
+                              method = 'glmnet',
+                              trControl = trainControl, 
+                              tuneGrid = tuneGridGoogSRdummy)
+elasticOutGoogSRdummy$bestTune$alpha
+
+glmnetOutGoogSRdummy = glmnet(x = XtrainMat_googSRdummy, 
+                              y = as.factor(Ytrain_googSRdummy),
+                              alpha = 0.25,
+                              family = 'binomial')
+probHatTest_GoogSRdummy = predict(glmnetOutGoogSRdummy, XtestMat_googSRdummy,
+                                  s = elasticOutGoogSRdummy$bestTune$lambda,
+                                  type = 'response')
+
+YhatTestGlmnet_GoogSRdummy = ifelse(probHatTest_GoogSRdummy > 0.5, '1', '0')
+YhatTest_GoogSRdummy       = predict(elasticOutGoogSRdummy,XtestMat_googSRdummy,
+                                     s = elasticOutGoogSRdummy$lambda, 
+                                     type = 'raw')
+
+#Cross-check they're the same. #Lecture 23 notes.
+table(YhatTest_GoogSRdummy,YhatTest_GoogSRdummy)
+
+betaHatGlmnetGoogSRdummy = coef(glmnetOutGoogSRdummy, 
+                                s = elasticOutGoogSRdummy$bestTune$lambda)
+#Accuracy
+mean(YhatTest_GoogSRdummy==Ytest_googSRdummy)
+probHatTest_GoogSRdummy_ = predict(elasticOutGoogSRdummy,XtestMat_googSRdummy,
+                                   s = elasticOutGoogSRdummy$bestTune$lambda,
+                                   type = 'prob')
+rocOut_GoogSRdummy = pROC::roc(response = Ytest_googSRdummy,                   
+                               probHatTest_GoogSRdummy_[,2])
+
+plot(rocOut_GoogSRdummy)
+
 ```
 
 ####Nonlinear Methods
 
+#####MARS
 ```{r MARS_Task3}
 set.seed(2020)
 #trControl = caret::trainControl(method = "repeatedcv", repeats = 2, number = 10)
@@ -2370,13 +2416,14 @@ marsOutTslaSR = train(x = XtrainMat_tslaSR, y = Ytrain_tslaSR,
 marsOutTslaSR$bestTune
 
 
-trControl_tslaSRdummy = caret::trainControl(method = "repeatcv", repeats = 2, 
+trControl_tslaSRdummy = caret::trainControl(method = "repeatedcv", repeats = 2, 
                                 number = 10, classProbs = TRUE)
 Ytrain_tslaSRdummy_ = as.factor(Ytrain_tslaSRdummy[Ytrain_tslaSRdummy == '1'|
                                                    Ytrain_tslaSRdummy == '0'])
-Ytrain_tslaSRdummy_ = relevel(Ytrain_tslaSRdummy, ref = '0')
-Ytrain_tslaSRdummy
-####Debug!!!
+Ytrain_tslaSRdummy_ = relevel(Ytrain_tslaSRdummy_, ref = '0')
+
+
+levels(Ytrain_tslaSRdummy_) = c("No", "Yes")
 marsOutTslaSRdummy = train(x = XtrainMat_tslaSRdummy, 
                            y = Ytrain_tslaSRdummy_,
                       method = 'fda',
@@ -2387,18 +2434,231 @@ marsOutTslaSRdummy$bestTune
 
 
 ###GOOG
+#Y1
+tuneGridGoogHL      = expand.grid(degree = 1:3,
+                                  nprune = 10:35)
+marsOutGoogHL = train(x = XtrainMat_googHL, y = Ytrain_googHL,
+                      method = 'earth',
+                      tuneGrid = tuneGridGoogHL,
+                      trControl = trControl)
+marsOutGoogHL$bestTune
+plot(marsOutGoogHL)
+#Y2
+tuneGridGoogSR      = expand.grid(degree = 1:3,
+                                  nprune = 10:35)
+marsOutGoogSR = train(x = XtrainMat_googSR, y = Ytrain_googSR,
+                      method = 'earth',
+                      tuneGrid = tuneGridGoogSR,
+                      trControl = trControl)
+marsOutGoogSR$bestTune
+plot(marsOutGoogSR)
+#Y3
+tuneGridGoogSRdummy = expand.grid(degree = 1:3,
+                                  nprune = c(10,20,50,100))
+trControl_googSRdummy = caret::trainControl(method = "repeatedcv", repeats = 2, 
+                                number = 10, classProbs = TRUE)
+Ytrain_googSRdummy_ = as.factor(Ytrain_googSRdummy[Ytrain_googSRdummy == '1'|
+                                                   Ytrain_googSRdummy == '0'])
+Ytrain_googSRdummy_ = relevel(Ytrain_googSRdummy_, ref = '0')
+
+
+levels(Ytrain_googSRdummy_) = c("No", "Yes")
+
+marsOutGoogSRdummy = train(x = XtrainMat_googSRdummy, 
+                           y = Ytrain_googSRdummy_,
+                      method = 'fda',
+                      metric = 'Accuracy',
+                      tuneGrid = tuneGridGoogSRdummy,
+                      trControl = trControl_googSRdummy)
+
+marsOutGoogSRdummy$bestTune
+plot(marsOutGoogSRdummy)
+
+
+
+```
+
+#####Trees
+
+```{r regressionTree}
+####TSLA
+trControl = caret::trainControl(method = "repeatedcv", repeats = 2, 
+                                number = 10, classProbs = TRUE)
+#Y1
+tuneGridTree_TslaHL = expand.grid(cp = c(0.001,0.01,0.1))
+rpartOut_TslaHL     = train(x = XtrainMat_tslaHL, y = Ytrain_tslaHL,
+                            method = "rpart",
+                            tuneGrid = tuneGridTree_TslaHL,
+                            trControl = trControl)
+plot(rpartOut_TslaHL$finalModel, margin = rep(.1,4))
+text(rpartOut_TslaHL$finalModel, cex = 0.6, digits = 1)
+#Y2
+tuneGridTree_TslaSR = expand.grid(cp = c(0.001,0.01,0.1))
+rpartOut_TslaSR     = train(x = Xtrain_tslaSR, y = Ytrain_tslaSR,
+                            method = "rpart",
+                            tuneGrid = tuneGridTree_TslaSR,
+                            trControl = trControl)
+plot(rpartOut_TslaSR$finalModel, margin = rep(.1,4))
+text(rpartOut_TslaSR$finalModel, cex = 0.6, digits = 1)
+
+```
+
+```{r classificationTree}
+
+```
+
+
+```{r regressionRandomForest}
+set.seed(2020)
+####TSLA
+trControl = caret::trainControl(method = "repeatedcv", repeats = 2, 
+                                number = 10, classProbs = TRUE)
+#Y1
+tuneGridRanger_TslaHL = data.frame(splitrule = "variance", min.node.size = 5,
+                                   mtry = round(sqrt(ncol(Xtrain_tslaHL))))
+rfOut_tslaHL  = train(x = XtrainMat_tslaHL, y = Ytrain_tslaHL, 
+                      method = "ranger",
+                      num.trees = 500,
+                      tuneGrid = tuneGridRanger_TslaHL, 
+                      importance = "permutation",
+                      trControl = trControl)
+rfOut_tslaHL$finalModel
+
+#Y2
+tuneGridRanger_TslaSR = data.frame(splitrule = "variance", min.node.size = 5,
+                                   mtry = round(sqrt(ncol(Xtrain_tslaSR))))
+rfOut_tslaSR  = train(x = XtrainMat_tslaSR, y = Ytrain_tslaSR, 
+                      method = "ranger",
+                      num.trees = 500,
+                      tuneGrid = tuneGridRanger_TslaSR, 
+                      importance = "permutation",
+                      trControl = trControl)
+rfOut_tslaSR$finalModel
+
+#Y3
+tuneGridRanger_TslaSRdummy = data.frame(splitrule = "variance", min.node.size = 5,
+                                   mtry = round(sqrt(ncol(Xtrain_tslaSRdummy))))
+rfOut_tslaSRdummy  = train(x = XtrainMat_tslaSRdummy, y = Ytrain_tslaSRdummy, 
+                      method = "ranger",
+                      num.trees = 500,
+                      tuneGrid = tuneGridRanger_TslaSRdummy, 
+                      importance = "permutation",
+                      trControl = trControl)
+rfOut_tslaSRdummy$finalModel
+```
+
+```{r classificationRandomForest}
+set.seed(2020)
+####TSLA
+#Y1
+tuneGridRandom_TslaHL = data.frame('nrounds'= c(50,150,500,1000,2000,3000),
+                                   'max_depth' = 6,
+                                   'eta' = 0.05,
+                                   'gamma' = 0,
+                                   'colsample_bytree' = 1,
+                                   'min_child_weight' = 0,
+                                   'subsample' = 0.5)
+
+boostOutRandom_TslaHL = train(x = Xtrain_tslaHL, y = Ytrain_tslaHL,
+                              method = 'xgbTree', verbose = 0,
+                              tuneGrid = tuneGridRandom_TslaHL,
+                              trControl = trControl)
+plot(boostOutRandom_TslaHL)
+
+#Y2
+tuneGridRandom_TslaSR = data.frame('nrounds'= c(50,150,500,1000,2000,3000),
+                                   'max_depth' = 6,
+                                   'eta' = 0.05,
+                                   'gamma' = 0,
+                                   'colsample_bytree' = 1,
+                                   'min_child_weight' = 0,
+                                   'subsample' = 0.5)
+
+boostOutRandom_TslaSR = train(x = Xtrain_tslaSR, y = Ytrain_tslaSR,
+                              method = 'xgbTree', verbose = 0,
+                              tuneGrid = tuneGridRandom_TslaSR,
+                              trControl = trControl)
+plot(boostOutRandom_TslaSR)
+
+
+#Y3
+tuneGridRandom_TslaSRdummy = data.frame('nrounds'= c(50,150,500,1000,2000,3000),
+                                   'max_depth' = 6,
+                                   'eta' = 0.05,
+                                   'gamma' = 0,
+                                   'colsample_bytree' = 1,
+                                   'min_child_weight' = 0,
+                                   'subsample' = 0.5)
+
+boostOutRandom_TslaSRdummy = train(x = Xtrain_tslaSRdummy, 
+                                   y = Ytrain_tslaSRdummy_,
+                              method = 'xgbTree', verbose = 0,
+                              tuneGrid = tuneGridRandom_TslaSRdummy,
+                              trControl = trControl)
+plot(boostOutRandom_TslaSRdummy)
+
+
+
+####GOOG
+#Y1
+tuneGridRandom_GoogHL = data.frame('nrounds'= c(50,150,500,1000,2000,3000),
+                                   'max_depth' = 6,
+                                   'eta' = 0.05,
+                                   'gamma' = 0,
+                                   'colsample_bytree' = 1,
+                                   'min_child_weight' = 0,
+                                   'subsample' = 0.5)
+
+boostOutRandom_GoogHL = train(x = Xtrain_googHL, y = Ytrain_googHL,
+                              method = 'xgbTree', verbose = 0,
+                              tuneGrid = tuneGridRandom_GoogHL,
+                              trControl = trControl)
+plot(boostOutRandom_GoogHL)
+
+#Y2
+tuneGridRandom_TslaSR = data.frame('nrounds'= c(50,150,500,1000,2000,3000),
+                                   'max_depth' = 6,
+                                   'eta' = 0.05,
+                                   'gamma' = 0,
+                                   'colsample_bytree' = 1,
+                                   'min_child_weight' = 0,
+                                   'subsample' = 0.5)
+
+boostOutRandom_TslaSR = train(x = Xtrain_tslaSR, y = Ytrain_tslaSR,
+                              method = 'xgbTree', verbose = 0,
+                              tuneGrid = tuneGridRandom_TslaSR,
+                              trControl = trControl)
+plot(boostOutRandom_TslaSR)
+
+
+#Y3
+tuneGridRandom_TslaSRdummy = data.frame('nrounds'= c(50,150,500,1000,2000,3000),
+                                   'max_depth' = 6,
+                                   'eta' = 0.05,
+                                   'gamma' = 0,
+                                   'colsample_bytree' = 1,
+                                   'min_child_weight' = 0,
+                                   'subsample' = 0.5)
+
+boostOutRandom_TslaSRdummy = train(x = Xtrain_tslaSRdummy, 
+                                   y = Ytrain_tslaSRdummy_,
+                              method = 'xgbTree', verbose = 0,
+                              tuneGrid = tuneGridRandom_TslaSRdummy,
+                              trControl = trControl)
+plot(boostOutRandom_TslaSRdummy)
+
+
 ```
 
 
 
+```{r regressionBoosting}
 
+```
 
+```{r classificationBoosting}
 
-
-
-
-
-
+```
 
 
 
