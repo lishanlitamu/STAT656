@@ -42,7 +42,7 @@ library(glmnet)   #Elastic net regression
 #library(tensorflow)
 library(foreach)
 library(kknn) #knn regression
-
+library(pROC) #ROC curve
 knitr::opts_chunk$set(echo = T)
 ```
 
@@ -2131,11 +2131,11 @@ caret::featurePlot(Xtrain_googHL[,41:54], Ytrain_googHL)
 caret::featurePlot(Xtrain_googSR[,41:54], Ytrain_googSR)
 caret::featurePlot(Xtrain_googSRdummy[,41:54], Ytrain_googSRdummy)
 ```
+
 ```{r setupTask3}
 
 #Repeated cross validation
 trControl = caret::trainControl(method = "repeatedcv", repeats = 2, number = 10)
-
 
 XtrainMat_tslaHL      = as.matrix(Xtrain_tslaHL)
 XtestMat_tslaHL       = as.matrix(Xtest_tslaHL)
@@ -2164,7 +2164,7 @@ set.seed(2020)
 
 ####Supervisor Y1 = YtslaStandardizedWithDummy$diffHighLowTomorrow
 ####TSLA
-#trControl = caret::trainControl(method = "repeatedcv", repeats = 2, number = 10)
+trControl = caret::trainControl(method = "repeatedcv", repeats = 2, number = 10)
 
 lassoGridTslaHL = expand.grid(lambda = c(0.0001,0.001, 0.01, 0.05, 0.1, 0.2),
                             alpha = c(0.05,0.5,1))
@@ -2248,7 +2248,7 @@ glmnetOutTslaHL       = glmnet(x = XtrainMat_tslaHL, y = Ytrain_tslaHL,
 betaHatGlmnetTslaHL   = coef(glmnetOutTslaHL, 
                              s = elasticOutTslaHL$bestTune$lambda)
 YhatTrainGlmnetTslaHL = predict(glmnetOutTslaHL, XtrainMat_tslaHL, 
-                                s = elasticOutTslaHL$bestTune$lambda )
+                                s = elasticOutTslaHL$bestTune$lambda)
 
 residualsTslaHL = Ytrain_tslaHL - YhatTrainGlmnetTslaHL
 plot(YhatTrainGlmnetTslaHL, residualsTslaHL, 
@@ -2274,7 +2274,6 @@ glmnetOutTslaSR       = glmnet(x = XtrainMat_tslaSR, y = Ytrain_tslaSR,
                                alpha = elasticOutTslaSR$bestTune$alpha)
 betaHatGlmnetTslaSR   = coef(glmnetOutTslaSR, 
                              s = elasticOutTslaSR$bestTune$lambda)
-
 YhatTrainGlmnetTslaSR = predict(glmnetOutTslaSR, XtrainMat_tslaSR, 
                                 s = elasticOutTslaSR$bestTune$lambda)
 
@@ -2284,12 +2283,12 @@ plot(YhatTrainGlmnetTslaSR, residualsTslaSR,
      ylab = "Residuals")
 
 ####GOOG
-glmnetOutGoogSR       = glmnet(x = XtrainMat_googSR, y = Ytrain_googSR, 
+glmnetOutGoogSR       = glmnet(x = XtrainMat_googSR, y = Ytrain_googSR,
                                alpha = elasticOutGoogSR$bestTune$alpha)
 betaHatGlmnetGoogSR   = coef(glmnetOutGoogSR, 
                              s = elasticOutGoogSR$bestTune$lambda)
 YhatTrainGlmnetGoogSR = predict(glmnetOutGoogSR, XtrainMat_googSR, 
-                                s = elasticOutGoogSR$bestTune$lambda )
+                                s = elasticOutGoogSR$bestTune$lambda)
 
 residualsGoogSR = Ytrain_googSR - YhatTrainGlmnetGoogSR
 plot(YhatTrainGlmnetGoogSR, residualsGoogSR, 
@@ -2297,6 +2296,120 @@ plot(YhatTrainGlmnetGoogSR, residualsGoogSR,
      ylab = "Residuals")
 
 ```
+
+####Logistic Classification
+```{r logisticClassification}
+set.seed(2020)
+K = 10
+trainControl = trainControl(method = 'cv', number = K)
+tuneGridTslaSRdummy = expand.grid('alpha' = c(0,.25,.5,.75,1),
+                                  'lambda' = seq(0.000001, .001, length.out = 30))
+elasticOutTslaSRdummy = train(x = Xtrain_tslaSRdummy, 
+                              y = as.factor(Ytrain_tslaSRdummy),
+                              method = 'glmnet',
+                              trControl = trainControl, 
+                              tuneGrid = tuneGridTslaSRdummy)
+elasticOutTslaSRdummy$bestTune$alpha
+
+glmnetOutTslaSRdummy = glmnet(x = XtrainMat_tslaSRdummy, 
+                              y = as.factor(Ytrain_tslaSRdummy),
+                              alpha = 0.25,
+                              family = 'binomial')
+probHatTest_TslaSRdummy = predict(glmnetOutTslaSRdummy, XtestMat_tslaSRdummy,
+                                  s = elasticOutTslaSRdummy$bestTune$lambda,
+                                  type = 'response')
+
+YhatTestGlmnet_TslaSRdummy = ifelse(probHatTest_TslaSRdummy > 0.5, '1', '0')
+YhatTest_TslaSRdummy       = predict(elasticOutTslaSRdummy,XtestMat_tslaSRdummy,
+                                     s = elasticOutTslaSRdummy$lambda, 
+                                     type = 'raw')
+
+#Cross-check they're the same. #Lecture 23 notes.
+table(YhatTest_TslaSRdummy,YhatTest_TslaSRdummy)
+
+betaHatGlmnetTslaSRdummy = coef(glmnetOutTslaSRdummy, 
+                                s = elasticOutTslaSRdummy$bestTune$lambda)
+#Accuracy
+mean(YhatTest_TslaSRdummy==Ytest_tslaSRdummy)
+probHatTest_TslaSRdummy_ = predict(elasticOutTslaSRdummy,XtestMat_tslaSRdummy,
+                                   s = elasticOutTslaSRdummy$bestTune$lambda,
+                                   type = 'prob')
+rocOut_TslaSRdummy = pROC::roc(response = Ytest_tslaSRdummy,                   
+                               probHatTest_TslaSRdummy_[,2])
+
+plot(rocOut_TslaSRdummy)
+
+```
+
+####Nonlinear Methods
+
+```{r MARS_Task3}
+set.seed(2020)
+#trControl = caret::trainControl(method = "repeatedcv", repeats = 2, number = 10)
+
+###TSLA
+tuneGridTslaHL      = expand.grid(degree = 1:3,
+                                  nprune = 10:35)
+
+tuneGridTslaSR      = expand.grid(degree = 1:3,
+                                  nprune = 10:35)
+
+tuneGridTslaSRdummy = expand.grid(degree = 1:3,
+                                  nprune = c(10,20,50,100))
+
+marsOutTslaHL = train(x = XtrainMat_tslaHL, y = Ytrain_tslaHL,
+                      method = 'earth',
+                      tuneGrid = tuneGridTslaHL,
+                      trControl = trControl)
+marsOutTslaHL$bestTune
+
+marsOutTslaSR = train(x = XtrainMat_tslaSR, y = Ytrain_tslaSR,
+                      method = 'earth',
+                      tuneGrid = tuneGridTslaSR,
+                      trControl = trControl)
+marsOutTslaSR$bestTune
+
+
+trControl_tslaSRdummy = caret::trainControl(method = "repeatcv", repeats = 2, 
+                                number = 10, classProbs = TRUE)
+Ytrain_tslaSRdummy_ = as.factor(Ytrain_tslaSRdummy[Ytrain_tslaSRdummy == '1'|
+                                                   Ytrain_tslaSRdummy == '0'])
+Ytrain_tslaSRdummy_ = relevel(Ytrain_tslaSRdummy, ref = '0')
+Ytrain_tslaSRdummy
+####Debug!!!
+marsOutTslaSRdummy = train(x = XtrainMat_tslaSRdummy, 
+                           y = Ytrain_tslaSRdummy_,
+                      method = 'fda',
+                      metric = 'Accuracy',
+                      tuneGrid = tuneGridTslaSRdummy,
+                      trControl = trControl_tslaSRdummy)
+marsOutTslaSRdummy$bestTune
+
+
+###GOOG
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
