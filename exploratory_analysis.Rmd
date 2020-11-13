@@ -2164,7 +2164,7 @@ doParallel::registerDoParallel(cl)
 ```
 
 
-```{r linearTunningParameters}
+```{r linearTuningParameters}
 set.seed(2020)
 
 ####Supervisor Y1 = YtslaStandardizedWithDummy$diffHighLowTomorrow
@@ -2335,14 +2335,14 @@ table(YhatTest_TslaSRdummy,YhatTest_TslaSRdummy)
 betaHatGlmnetTslaSRdummy = coef(glmnetOutTslaSRdummy, 
                                 s = elasticOutTslaSRdummy$bestTune$lambda)
 #Accuracy
-mean(YhatTest_TslaSRdummy==Ytest_tslaSRdummy)
+accuracyLinear_TslaSRdummy = mean(YhatTest_TslaSRdummy==Ytest_tslaSRdummy)
 probHatTest_TslaSRdummy_ = predict(elasticOutTslaSRdummy,XtestMat_tslaSRdummy,
                                    s = elasticOutTslaSRdummy$bestTune$lambda,
                                    type = 'prob')
 rocOut_TslaSRdummy = pROC::roc(response = Ytest_tslaSRdummy,                   
                                probHatTest_TslaSRdummy_[,2])
 
-plot(rocOut_TslaSRdummy)
+plot(rocOut_TslaSRdummy, main = "ROC Plot - TSLA Stock Return (Dummy)")
 
 
 ####GOOG
@@ -2377,14 +2377,32 @@ table(YhatTest_GoogSRdummy,YhatTest_GoogSRdummy)
 betaHatGlmnetGoogSRdummy = coef(glmnetOutGoogSRdummy, 
                                 s = elasticOutGoogSRdummy$bestTune$lambda)
 #Accuracy
-mean(YhatTest_GoogSRdummy==Ytest_googSRdummy)
+accuracyLinear_GoogSRdummy = mean(YhatTest_GoogSRdummy==Ytest_googSRdummy)
 probHatTest_GoogSRdummy_ = predict(elasticOutGoogSRdummy,XtestMat_googSRdummy,
                                    s = elasticOutGoogSRdummy$bestTune$lambda,
                                    type = 'prob')
 rocOut_GoogSRdummy = pROC::roc(response = Ytest_googSRdummy,                   
                                probHatTest_GoogSRdummy_[,2])
 
-plot(rocOut_GoogSRdummy)
+plot(rocOut_GoogSRdummy, main = "ROC Plot - GOOG Stock Return (Dummy)")
+
+
+
+#List of Accuracy
+accuracyLinear = rbind(
+  accuracyLinear_TslaSRdummy,
+  accuracyLinear_GoogSRdummy
+  )
+
+row.names(accuracyLinear) = c("TSLA - Stock Return(dummy)", 
+                "GOOG - Stock Return(dummy)")
+
+knitr::kable(
+ accuracyLinear,
+ col.names = c("Accuracy based on Testing data"),
+ caption   = "Table 2: Accuracy - Logistic Elastic Net",
+ align     = "lccrr"
+)
 
 ```
 
@@ -2406,17 +2424,20 @@ tuneGridTslaSRdummy = expand.grid(degree = 1:3,
                                   nprune = c(10,20,50,100))
 
 marsOutTslaHL = train(x = XtrainMat_tslaHL, y = Ytrain_tslaHL,
-                      method = 'earth',
+                      method = 'earth', metric = 'RMSE',
                       tuneGrid = tuneGridTslaHL,
                       trControl = trControl)
 marsOutTslaHL$bestTune
 
+plot(marsOutTslaHL, main = "MARS Regression - TSLA diffHighLow")
+ggplot(marsOutTslaHL)+labs( title= "MARS Regression - TSLA diffHighLow")
+
 marsOutTslaSR = train(x = XtrainMat_tslaSR, y = Ytrain_tslaSR,
-                      method = 'earth',
+                      method = 'earth', metric = 'RMSE',
                       tuneGrid = tuneGridTslaSR,
                       trControl = trControl)
 marsOutTslaSR$bestTune
-
+plot(marsOutTslaSR, main = "MARS Regression - TSLA stockReturn")
 
 trControl_tslaSRdummy = caret::trainControl(method = "repeatedcv", repeats = 2, 
                                 number = 10, classProbs = TRUE)
@@ -2433,6 +2454,7 @@ marsOutTslaSRdummy = train(x = XtrainMat_tslaSRdummy,
                       tuneGrid = tuneGridTslaSRdummy,
                       trControl = trControl_tslaSRdummy)
 marsOutTslaSRdummy$bestTune
+plot(marsOutTslaSRdummy)
 
 #YhatTestFDA_TslaSRdummyProb = predict(marsOutTslaSRdummy, Xtest_tslaSRdummy,
                                   #type = 'prob')
@@ -2445,20 +2467,24 @@ marsOutTslaSRdummy$bestTune
 tuneGridGoogHL      = expand.grid(degree = 1:3,
                                   nprune = 10:35)
 marsOutGoogHL = train(x = XtrainMat_googHL, y = Ytrain_googHL,
-                      method = 'earth',
+                      method = 'earth', metric = 'RMSE',
                       tuneGrid = tuneGridGoogHL,
                       trControl = trControl)
 marsOutGoogHL$bestTune
-plot(marsOutGoogHL)
+ggplot(marsOutGoogHL)+labs( title= "MARS Regression - GOOG diffHighLow")
+
+#summary(marsOutGoogHL) %>% .$coefficients %>% head(10)
+
+
 #Y2
 tuneGridGoogSR      = expand.grid(degree = 1:3,
                                   nprune = 10:35)
 marsOutGoogSR = train(x = XtrainMat_googSR, y = Ytrain_googSR,
-                      method = 'earth',
+                      method = 'earth', metric = 'RMSE',
                       tuneGrid = tuneGridGoogSR,
                       trControl = trControl)
 marsOutGoogSR$bestTune
-plot(marsOutGoogSR)
+plot(marsOutGoogSR, main = "MARS Regression - GOOG stockReturn")
 #Y3
 tuneGridGoogSRdummy = expand.grid(degree = 1:3,
                                   nprune = c(10,20,50,100))
@@ -2487,6 +2513,64 @@ plot(marsOutGoogSRdummy)
 
 #table(YhatTestFDA_GoogSRdummy, Ytest_googSRdummy)
 
+
+
+###Summary
+ggplot(marsOutTslaHL)+labs( title= "MARS Regression - TSLA diffHighLow")
+ggplot(marsOutTslaSR)+labs( title= "MARS Regression - TSLA stockReturn")
+ggplot(marsOutTslaSRdummy)+labs(title= "MARS Classification - TSLA stockReturn(dummy)")
+ggplot(marsOutGoogHL)+labs( title= "MARS Regression - GOOG diffHighLow")
+ggplot(marsOutGoogSR)+labs( title= "MARS Regression - GOOG stockReturn")
+ggplot(marsOutGoogSRdummy)+labs(title= "MARS Classification - GOOG stockReturn(dummy)")
+
+#List of Tuning Parameters
+tuneParaMars = rbind(
+  marsOutTslaHL$bestTune,
+  marsOutTslaSR$bestTune,
+  marsOutTslaSRdummy$bestTune,
+  marsOutGoogHL$bestTune,
+  marsOutGoogSR$bestTune,
+  marsOutGoogSRdummy$bestTune
+  )
+
+
+row.names(tuneParaMars) = c("TSLA - diffHighLow", "TSLA - stockReturn", 
+                            "TSLA - stockReturn(Dummy)","GOOG - diffHighLow", 
+                            "GOOG - stockReturn","GOOG - stockReturn(Dummy)")
+
+knitr::kable(
+ tuneParaMars,
+ col.names = c("nprune", "degree"),
+ caption   = "Table 3: MARS regression and Classification - Tuning Parameters",
+ align     = "lccrr"
+)
+
+#Importance
+
+marsTslaHLvip = vip(marsOutTslaHL, num_features = 50, bar = FALSE, value = "gcv") +
+  ggtitle("Plot of Variable Importance: TSLA - diffHighLow")
+plot(marsTslaHLvip)
+
+marsTslaSRvip = vip(marsOutTslaSR, num_features = 50, bar = FALSE, value = "gcv") +
+  ggtitle("Plot of Variable Importance: TSLA - stockReturn")
+plot(marsTslaSRvip)
+
+marsTslaSRdummyvip = vip(marsOutTslaSRdummy, num_features = 50, bar = FALSE, value = "gcv") + ggtitle("Plot of Variable Importance: TSLA - stockReturn(dummy)")
+plot(marsTslaSRdummyvip)
+
+
+marsGoogHLvip = vip(marsOutGoogHL, num_features = 50, bar = FALSE, value = "gcv") +
+  ggtitle("Plot of Variable Importance: GOOG - diffHighLow")
+plot(marsGoogHLvip)
+
+marsGoogSRvip = vip(marsOutGoogSR, num_features = 50, bar = FALSE, value = "gcv") +
+  ggtitle("Plot of Variable Importance: GOOG - stockReturn")
+plot(marsGoogSRvip)
+
+marsGoogSRdummyvip = vip(marsOutGoogSRdummy, num_features = 50, bar = FALSE, value = "gcv") + ggtitle("Plot of Variable Importance: GOOG - stockReturn(dummy)")
+plot(marsGoogSRdummyvip)
+
+
 ```
 
 #####Classification Tree
@@ -2502,7 +2586,8 @@ rpartOut_TslaHL     = train(x = XtrainMat_tslaHL, y = Ytrain_tslaHL,
                             method = "rpart",
                             tuneGrid = tuneGridTree_TslaHL,
                             trControl = trControl)
-plot(rpartOut_TslaHL$finalModel, margin = rep(.1,4))
+plot(rpartOut_TslaHL$finalModel, margin = rep(.1,4),
+     main = "Classification Tree - TSLA diffHighLow")
 text(rpartOut_TslaHL$finalModel, cex = 0.6, digits = 1)
 #Y2
 tuneGridTree_TslaSR = expand.grid(cp = c(0.0001,0.001,0.01,0.1,0.15,0.5,1))
@@ -2524,7 +2609,8 @@ rpartOut_TslaSRdummy     = train(x = XtrainMat_tslaSRdummy,
                             parms = list(split = "gini"),
                             tuneGrid = tuneGridTree_TslaSRdummy,
                             trControl = trControl)
-plot(rpartOut_TslaSRdummy$finalModel, margin = rep(.1,4))
+plot(rpartOut_TslaSRdummy$finalModel, margin = rep(.1,4),
+     main = "Classification Tree - TSLA stockReturn(dummy)")
 text(rpartOut_TslaSRdummy$finalModel, cex = 0.6, digits = 1)
 
 
@@ -2537,17 +2623,21 @@ tuneGridTree_GoogHL = expand.grid(cp = c(0.0001,0.001,0.01,0.1,0.15,0.5,1))
 rpartOut_GoogHL     = train(x = XtrainMat_googHL, y = Ytrain_googHL,
                             method = "rpart",
                             tuneGrid = tuneGridTree_GoogHL,
-                            trControl = trControl)
-plot(rpartOut_GoogHL$finalModel, margin = rep(.1,4))
+                            trControl = trControl,
+                            control = rpart.control(minsplit = 1, minbucket = 1))
+plot(rpartOut_GoogHL$finalModel, margin = rep(.1,4),
+     main = "Classification Tree - GOOG diffHighLow")
 text(rpartOut_GoogHL$finalModel, cex = 0.6, digits = 1)
 #Y2
 tuneGridTree_GoogSR = expand.grid(cp = c(0.0001,0.001,0.01,0.1,0.15,0.5,1))
 rpartOut_GoogSR     = train(x = XtrainMat_googSR, y = Ytrain_googSR,
                             method = "rpart",
                             tuneGrid = tuneGridTree_GoogSR,
-                            trControl = trControl)
+                            trControl = trControl,
+                            control = rpart.control(minsplit = 1, minbucket = 1,
+                                                    cp = 0))
 rpartOut_GoogSR$finalModel #just a root
-#plot(rpartOut_GoogSR$finalModel, margin = rep(.1,4))
+plot(rpartOut_GoogSR$finalModel, margin = rep(.1,4))
 #text(rpartOut_TslaSR$finalModel, cex = 0.6, digits = 1)
 
 
@@ -2558,9 +2648,11 @@ rpartOut_GoogSRdummy     = train(x = XtrainMat_googSRdummy,
                             method = "rpart",
                             parms = list(split = "gini"),
                             tuneGrid = tuneGridTree_GoogSRdummy,
-                            trControl = trControl)
+                            trControl = trControl,
+                            control = rpart.control(minsplit = 1, minbucket = 1,
+                                                    cp = 0))
 #one root
-#plot(rpartOut_GoogSRdummy$finalModel, margin = rep(.1,4))
+plot(rpartOut_GoogSRdummy$finalModel, margin = rep(.1,4))
 #text(rpartOut_GoogSRdummy$finalModel, cex = 0.6, digits = 1)
 
 
