@@ -2092,7 +2092,6 @@ Xtest_googSRdummy  = XgoogStandardizedWithDummy[-inTrain_googSRdummy,]
 
 ```
 
-
 ```{r dataReview}
 ####TSLA
 caret::featurePlot(Xtrain_tslaHL[,1:10], Ytrain_tslaHL)
@@ -2490,7 +2489,7 @@ plot(marsOutGoogSRdummy)
 
 ```
 
-#####Trees
+#####Classification Tree
 
 ```{r classificationTree}
 set.seed(2022)
@@ -2567,8 +2566,7 @@ rpartOut_GoogSRdummy     = train(x = XtrainMat_googSRdummy,
 
 ```
 
-
-
+#####Random Forest
 
 ```{r randomForest}
 set.seed(2020)
@@ -2649,6 +2647,8 @@ rfOut_googSRdummy  = train(x = XtrainMat_googSRdummy, y =as.matrix(Ytrain_googSR
 
 
 ```
+
+#####Boosting
 
 ```{r boosting}
 set.seed(2020)
@@ -2758,7 +2758,7 @@ plot(boostOutRandom_GoogSRdummy)
 
 ```
 
-
+#####Performance Review
 
 ```{r importanceBoosting}
 ####TSLA
