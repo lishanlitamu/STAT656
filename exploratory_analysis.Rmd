@@ -2179,7 +2179,7 @@ elasticOutTslaHL = train(x = XtrainMat_tslaHL, y = Ytrain_tslaHL,
                        method = 'glmnet',
                        tuneGrid = lassoGridTslaHL, 
                        trControl = trControl)
-plot(elasticOutTslaHL)
+plot(elasticOutTslaHL, main = "Elastic Net - TSLA diffHighLow")
 
 ####GOOG
 #trControl = caret::trainControl(method = "repeatedcv", repeats = 2, number = 10)
@@ -2192,7 +2192,7 @@ elasticOutGoogHL = train(x = XtrainMat_googHL, y = Ytrain_googHL,
                        method = 'glmnet',
                        tuneGrid = lassoGridGoogHL, 
                        trControl = trControl)
-plot(elasticOutGoogHL)
+plot(elasticOutGoogHL, main = "Elastic Net - GOOG diffHighLow")
 
 
 
@@ -2208,7 +2208,7 @@ elasticOutTslaSR = train(x = XtrainMat_tslaSR, y = Ytrain_tslaSR,
                        method = 'glmnet',
                        tuneGrid = lassoGridTslaSR, 
                        trControl = trControl)
-plot(elasticOutTslaSR)
+plot(elasticOutTslaSR, main = "Elastic Net - TSLA stockReturn")
 
 ####GOOG
 #trControl = caret::trainControl(method = "repeatedcv", repeats = 2, number = 10)
@@ -2221,7 +2221,7 @@ elasticOutGoogSR = train(x = XtrainMat_googSR, y = Ytrain_googSR,
                        method = 'glmnet',
                        tuneGrid = lassoGridGoogSR, 
                        trControl = trControl)
-plot(elasticOutGoogSR)
+plot(elasticOutGoogSR, main = "Elastic Net - GOOG stockReturn")
 
 
 #List of turning parameters
@@ -2258,7 +2258,7 @@ YhatTrainGlmnetTslaHL = predict(glmnetOutTslaHL, XtrainMat_tslaHL,
 residualsTslaHL = Ytrain_tslaHL - YhatTrainGlmnetTslaHL
 plot(YhatTrainGlmnetTslaHL, residualsTslaHL, 
      xlab = "Traning predictions - TSLA diffHighLow",
-     ylab = "Residuals")
+     ylab = "Residuals", main = "Residual Plot - TSLA diffHighLow")
 
 ####GOOG
 glmnetOutGoogHL       = glmnet(x = XtrainMat_googHL, y = Ytrain_googHL, 
@@ -2271,7 +2271,7 @@ YhatTrainGlmnetGoogHL = predict(glmnetOutGoogHL, XtrainMat_googHL,
 residualsGoogHL = Ytrain_googHL - YhatTrainGlmnetGoogHL
 plot(YhatTrainGlmnetGoogHL, residualsGoogHL, 
      xlab = "Traning predictions - GOOG diffHighLow",
-     ylab = "Residuals")
+     ylab = "Residuals", main = "Residual Plot - GOOG diffHighLow")
 
 ####Supervisor Y2 = YtslaStandardizedWithDummy$stockReturnTomorrow
 ####TSLA
@@ -2285,7 +2285,7 @@ YhatTrainGlmnetTslaSR = predict(glmnetOutTslaSR, XtrainMat_tslaSR,
 residualsTslaSR = Ytrain_tslaSR - YhatTrainGlmnetTslaSR
 plot(YhatTrainGlmnetTslaSR, residualsTslaSR, 
      xlab = "Traning predictions - TSLA Stock Return",
-     ylab = "Residuals")
+     ylab = "Residuals", main = "Residual Plot - TSLA stockReturn")
 
 ####GOOG
 glmnetOutGoogSR       = glmnet(x = XtrainMat_googSR, y = Ytrain_googSR,
@@ -2298,7 +2298,7 @@ YhatTrainGlmnetGoogSR = predict(glmnetOutGoogSR, XtrainMat_googSR,
 residualsGoogSR = Ytrain_googSR - YhatTrainGlmnetGoogSR
 plot(YhatTrainGlmnetGoogSR, residualsGoogSR, 
      xlab = "Traning predictions - GOOG Stock Return",
-     ylab = "Residuals")
+     ylab = "Residuals", main = "Residual Plot - GOOG stockReturn")
 
 ```
 
@@ -2723,7 +2723,7 @@ rfOut_googSR  = train(x = XtrainMat_googSR, y = Ytrain_googSR,
                       tuneGrid = tuneGridRanger_GoogSR, 
                       importance = "permutation",
                       trControl = trControl)
-rfOut_googSR$finalModel
+rfOut_googSR$finalM
 
 #Y3
 tuneGridRanger_GoogSRdummy = data.frame(splitrule = "gini", min.node.size = 5,
@@ -2737,7 +2737,27 @@ rfOut_googSRdummy  = train(x = XtrainMat_googSRdummy, y =as.matrix(Ytrain_googSR
 rfOut_googSRdummy$finalModel
 
 
+#List of Tuning Parameters
+tuneParaRF = rbind(
+  rfOut_tslaHL$bestTune,
+  rfOut_tslaSR$bestTune,
+  rfOut_tslaSRdummy$bestTune,
+  rfOut_googHL$bestTune,
+  rfOut_googSR$bestTune,
+  rfOut_googSRdummy$bestTune
+  )
 
+
+row.names(tuneParaRF) = c("TSLA - diffHighLow", "TSLA - stockReturn", 
+                            "TSLA - stockReturn(Dummy)","GOOG - diffHighLow", 
+                            "GOOG - stockReturn","GOOG - stockReturn(Dummy)")
+
+knitr::kable(
+ tuneParaRF,
+ col.names = c("mtry", "splitrule", "min.node.size"),
+ caption   = "Table 4: Random Forest regression and Classification - Tuning Parameters",
+ align     = "lccrr"
+)
 
 ```
 
@@ -2848,7 +2868,7 @@ boostOutRandom_GoogSRdummy = train(x = Xtrain_googSRdummy,
                               trControl = trControl)
 plot(boostOutRandom_GoogSRdummy)
 
-
+boostOutRandom_GoogSRdummy$bestTune
 
 ###Overview
 
@@ -2859,6 +2879,30 @@ plot(boostOutRandom_TslaSRdummy, main = "Boosting: TSLA stockReturn(Dummy)")
 plot(boostOutRandom_GoogHL, main = "Boosting: GOOG diffHighLow")
 plot(boostOutRandom_GoogSR, main = "Boosting: GOOG stockReturn")
 plot(boostOutRandom_GoogSRdummy, main = "Boosting: GOOG stockReturn(Dummy)")
+
+
+#List of Tuning Parameters
+tuneParaBoost = rbind(
+  boostOutRandom_TslaHL$bestTune,
+  boostOutRandom_TslaSR$bestTune,
+  boostOutRandom_TslaSRdummy$bestTune,
+  boostOutRandom_GoogHL$bestTune,
+  boostOutRandom_GoogSR$bestTune,
+  boostOutRandom_GoogSRdummy$bestTune
+  )
+
+
+row.names(tuneParaBoost) = c("TSLA - diffHighLow", "TSLA - stockReturn", 
+                            "TSLA - stockReturn(Dummy)","GOOG - diffHighLow", 
+                            "GOOG - stockReturn","GOOG - stockReturn(Dummy)")
+
+knitr::kable(
+ tuneParaBoost,
+ col.names = c("nrounds","max_depth","eta","gamma","colsample_bytree",
+               "min_child_weight","subsample"),
+ caption   = "Table 5: Boosting regression and Classification - Tuning Parameters",
+ align     = "lccrr"
+)
 
 ```
 
