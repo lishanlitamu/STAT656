@@ -2594,8 +2594,9 @@ tuneGridTree_TslaSR = expand.grid(cp = c(0.0001,0.001,0.01,0.1,0.15,0.5,1))
 rpartOut_TslaSR     = train(x = XtrainMat_tslaSR, y = Ytrain_tslaSR,
                             method = "rpart",
                             tuneGrid = tuneGridTree_TslaSR,
-                            trControl = trControl)
-#rpartOut_TslaSR$finalModel #just a root
+                            trControl = trControl,
+                            control = rpart.control(minsplit = 1, minbucket = 1))
+rpartOut_TslaSR$finalModel #just a root
 #plot(rpartOut_TslaSR$finalModel, margin = rep(.1,4))
 #text(rpartOut_TslaSR$finalModel, cex = 0.6, digits = 1)
 
@@ -2619,25 +2620,25 @@ text(rpartOut_TslaSRdummy$finalModel, cex = 0.6, digits = 1)
 #trControl = caret::trainControl(method = "repeatedcv", repeats = 2, 
                                # number = 10, classProbs = TRUE)
 #Y1
-tuneGridTree_GoogHL = expand.grid(cp = c(0.0001,0.001,0.01,0.1,0.15,0.5,1))
+tuneGridTree_GoogHL = expand.grid(cp = c(0,0.0001,0.001,0.01,0.1,0.15,0.5,1))
 rpartOut_GoogHL     = train(x = XtrainMat_googHL, y = Ytrain_googHL,
                             method = "rpart",
                             tuneGrid = tuneGridTree_GoogHL,
                             trControl = trControl,
-                            control = rpart.control(minsplit = 1, minbucket = 1))
+                            control = rpart.control(minsplit = 1, 
+                                                    minbucket = 1))
 plot(rpartOut_GoogHL$finalModel, margin = rep(.1,4),
      main = "Classification Tree - GOOG diffHighLow")
 text(rpartOut_GoogHL$finalModel, cex = 0.6, digits = 1)
 #Y2
-tuneGridTree_GoogSR = expand.grid(cp = c(0.0001,0.001,0.01,0.1,0.15,0.5,1))
+tuneGridTree_GoogSR = expand.grid(cp = c(0,0.0001,0.001,0.01,0.1,0.15,0.5,1))
 rpartOut_GoogSR     = train(x = XtrainMat_googSR, y = Ytrain_googSR,
                             method = "rpart",
                             tuneGrid = tuneGridTree_GoogSR,
                             trControl = trControl,
-                            control = rpart.control(minsplit = 1, minbucket = 1,
-                                                    cp = 0))
+                            control = rpart.control(minsplit = 1, minbucket = 1))
 rpartOut_GoogSR$finalModel #just a root
-plot(rpartOut_GoogSR$finalModel, margin = rep(.1,4))
+#plot(rpartOut_GoogSR$finalModel, margin = rep(.1,4))
 #text(rpartOut_TslaSR$finalModel, cex = 0.6, digits = 1)
 
 
@@ -2649,10 +2650,10 @@ rpartOut_GoogSRdummy     = train(x = XtrainMat_googSRdummy,
                             parms = list(split = "gini"),
                             tuneGrid = tuneGridTree_GoogSRdummy,
                             trControl = trControl,
-                            control = rpart.control(minsplit = 1, minbucket = 1,
-                                                    cp = 0))
+                            control = rpart.control(minsplit = 1, minbucket = 1))
 #one root
-plot(rpartOut_GoogSRdummy$finalModel, margin = rep(.1,4))
+rpartOut_GoogSRdummy$finalModel
+#plot(rpartOut_GoogSRdummy$finalModel, margin = rep(.1,4))
 #text(rpartOut_GoogSRdummy$finalModel, cex = 0.6, digits = 1)
 
 
@@ -2674,8 +2675,8 @@ rfOut_tslaHL  = train(x = XtrainMat_tslaHL, y = Ytrain_tslaHL,
                       tuneGrid = tuneGridRanger_TslaHL, 
                       importance = "permutation",
                       trControl = trControl)
-#rfOut_tslaHL$finalModel
-
+rfOut_tslaHL$finalModel
+#print(rfOut_tslaHL)
 #Y2
 tuneGridRanger_TslaSR = data.frame(splitrule = "variance", min.node.size = 5,
                                    mtry = round(sqrt(ncol(Xtrain_tslaSR))))
@@ -2697,7 +2698,7 @@ rfOut_tslaSRdummy  = train(x = XtrainMat_tslaSRdummy,
                       tuneGrid = tuneGridRanger_TslaSRdummy, 
                       importance = "permutation",
                       trControl = trControl)
-#rfOut_tslaSRdummy$finalModel
+rfOut_tslaSRdummy$finalModel
 
 ####GOOG
 #trControl = caret::trainControl(method = "repeatedcv", repeats = 2, 
@@ -2711,7 +2712,7 @@ rfOut_googHL  = train(x = XtrainMat_googHL, y = Ytrain_googHL,
                       tuneGrid = tuneGridRanger_GoogHL, 
                       importance = "permutation",
                       trControl = trControl)
-#rfOut_googHL$finalModel
+rfOut_googHL$finalModel
 
 #Y2
 tuneGridRanger_GoogSR = data.frame(splitrule = "variance", min.node.size = 5,
@@ -2722,7 +2723,7 @@ rfOut_googSR  = train(x = XtrainMat_googSR, y = Ytrain_googSR,
                       tuneGrid = tuneGridRanger_GoogSR, 
                       importance = "permutation",
                       trControl = trControl)
-#rfOut_googSR$finalModel
+rfOut_googSR$finalModel
 
 #Y3
 tuneGridRanger_GoogSRdummy = data.frame(splitrule = "gini", min.node.size = 5,
@@ -2733,7 +2734,7 @@ rfOut_googSRdummy  = train(x = XtrainMat_googSRdummy, y =as.matrix(Ytrain_googSR
                       tuneGrid = tuneGridRanger_GoogSRdummy, 
                       importance = "permutation",
                       trControl = trControl)
-#rfOut_googSRdummy$finalModel
+rfOut_googSRdummy$finalModel
 
 
 
@@ -2848,6 +2849,17 @@ boostOutRandom_GoogSRdummy = train(x = Xtrain_googSRdummy,
 plot(boostOutRandom_GoogSRdummy)
 
 
+
+###Overview
+
+plot(boostOutRandom_TslaHL, main = "Boosting: TSLA diffHighLow")
+plot(boostOutRandom_TslaSR, main = "Boosting: TSLA stockReturn")
+plot(boostOutRandom_TslaSRdummy, main = "Boosting: TSLA stockReturn(Dummy)")
+
+plot(boostOutRandom_GoogHL, main = "Boosting: GOOG diffHighLow")
+plot(boostOutRandom_GoogSR, main = "Boosting: GOOG stockReturn")
+plot(boostOutRandom_GoogSRdummy, main = "Boosting: GOOG stockReturn(Dummy)")
+
 ```
 
 #####Performance Review
@@ -2861,11 +2873,11 @@ plot(boostOutRandom_GoogSRdummy)
 (boostImportance_TslaSRdummy = xgboost::xgb.importance(model = boostOutRandom_TslaSRdummy$finalModel))
 
 ####GOOG
-(boostImportance_GoogHL0 = xgboost::xgb.importance(model = boostOutRandom_GoogHL$finalModel))
+(boostImportance_GoogHL = xgboost::xgb.importance(model = boostOutRandom_GoogHL$finalModel))
 
-(boostImportance_GoogSR0 = xgboost::xgb.importance(model = boostOutRandom_GoogSR$finalModel))
+(boostImportance_GoogSR = xgboost::xgb.importance(model = boostOutRandom_GoogSR$finalModel))
 
-(boostImportance_GoogSRdummy0 = xgboost::xgb.importance(model = boostOutRandom_GoogSRdummy$finalModel))
+(boostImportance_GoogSRdummy = xgboost::xgb.importance(model = boostOutRandom_GoogSRdummy$finalModel))
 ```
 
 ```{r judgePerformance}
@@ -2874,15 +2886,15 @@ set.seed(2020)
 ####TSLA
 #Y1
 resultsTest_TslaHL  = data.frame(
-  TslaHL_YhatGlmnet = c(predict(glmnetOutTslaHL, XtestMat_tslaHL,
+  YhatGlmnet = c(predict(glmnetOutTslaHL, XtestMat_tslaHL,
                          s = elasticOutTslaHL$bestTune$lambda)),
-  TslaHL_YhatMARS   = c(predict(marsOutTslaHL, XtestMat_tslaHL)),
-  TslaHL_YhatTrees  = predict(rpartOut_TslaHL, XtestMat_tslaHL),
-  TslaHL_YhatRF     = predict(rfOut_tslaHL, XtestMat_tslaHL),
-  TslaHL_YhatBoost  = predict(boostOutRandom_TslaHL, XtestMat_tslaHL)
+  YhatMARS   = c(predict(marsOutTslaHL, XtestMat_tslaHL)),
+  YhatTrees  = predict(rpartOut_TslaHL, XtestMat_tslaHL),
+  YhatRF     = predict(rfOut_tslaHL, XtestMat_tslaHL),
+  YhatBoost  = predict(boostOutRandom_TslaHL, XtestMat_tslaHL)
 )
 
-
+par(mar=c(7,5,4,2))
 plot(1:length(resultsTest_TslaHL), 
      sapply(resultsTest_TslaHL, function(Yhat){mean((Yhat - Ytest_tslaHL)^2)}),
      xlab = '', xaxt = 'n', pch = 16, ylab = 'test error', 
@@ -2891,15 +2903,15 @@ axis(1, labels = names(resultsTest_TslaHL), at = 1:ncol(resultsTest_TslaHL), las
 
 #Y2
 resultsTest_TslaSR  = data.frame(
-  TslaSR_YhatGlmnet = c(predict(glmnetOutTslaSR, XtestMat_tslaSR,
+  YhatGlmnet = c(predict(glmnetOutTslaSR, XtestMat_tslaSR,
                          s = elasticOutTslaSR$bestTune$lambda)),
-  TslaSR_YhatMARS   = c(predict(marsOutTslaSR, XtestMat_tslaSR)),
-  TslaSR_YhatTrees  = predict(rpartOut_TslaSR, XtestMat_tslaSR),
-  TslaSR_YhatRF     = predict(rfOut_tslaSR, XtestMat_tslaSR),
-  TslaSR_YhatBoost  = predict(boostOutRandom_TslaSR, XtestMat_tslaSR)
+  YhatMARS   = c(predict(marsOutTslaSR, XtestMat_tslaSR)),
+  YhatTrees  = predict(rpartOut_TslaSR, XtestMat_tslaSR),
+  YhatRF     = predict(rfOut_tslaSR, XtestMat_tslaSR),
+  YhatBoost  = predict(boostOutRandom_TslaSR, XtestMat_tslaSR)
 )
 
-
+par(mar=c(7,5,4,2))
 plot(1:length(resultsTest_TslaSR), 
      sapply(resultsTest_TslaSR, function(Yhat){mean((Yhat - Ytest_tslaSR)^2)}),
      xlab = '', xaxt = 'n', pch = 16, ylab = 'test error', 
@@ -2909,15 +2921,15 @@ axis(1, labels = names(resultsTest_TslaSR), at = 1:ncol(resultsTest_TslaSR), las
 ####GOOG
 #Y1
 resultsTest_GoogHL  = data.frame(
-  GoogHL_YhatGlmnet = c(predict(glmnetOutGoogHL, XtestMat_googHL,
+  YhatGlmnet = c(predict(glmnetOutGoogHL, XtestMat_googHL,
                          s = elasticOutGoogHL$bestTune$lambda)),
-  GoogHL_YhatMARS   = c(predict(marsOutGoogHL, XtestMat_googHL)),
-  GoogHL_YhatTrees  = predict(rpartOut_GoogHL, XtestMat_googHL),
-  GoogHL_YhatRF     = predict(rfOut_googHL, XtestMat_googHL),
-  GoogHL_YhatBoost  = predict(boostOutRandom_GoogHL, XtestMat_googHL)
+  YhatMARS   = c(predict(marsOutGoogHL, XtestMat_googHL)),
+  YhatTrees  = predict(rpartOut_GoogHL, XtestMat_googHL),
+  YhatRF     = predict(rfOut_googHL, XtestMat_googHL),
+  YhatBoost  = predict(boostOutRandom_GoogHL, XtestMat_googHL)
 )
 
-
+par(mar=c(7,5,4,2))
 plot(1:length(resultsTest_GoogHL), 
      sapply(resultsTest_GoogHL, function(Yhat){mean((Yhat - Ytest_googHL)^2)}),
      xlab = '', xaxt = 'n', pch = 16, ylab = 'test error', 
@@ -2926,15 +2938,15 @@ axis(1, labels = names(resultsTest_GoogHL), at = 1:ncol(resultsTest_GoogHL), las
 
 #Y2
 resultsTest_GoogSR  = data.frame(
-  GoogSR_YhatGlmnet = c(predict(glmnetOutGoogSR, XtestMat_googSR,
+  YhatGlmnet = c(predict(glmnetOutGoogSR, XtestMat_googSR,
                          s = elasticOutGoogSR$bestTune$lambda)),
-  GoogSR_YhatMARS   = c(predict(marsOutGoogSR, XtestMat_googSR)),
-  GoogSR_YhatTrees  = predict(rpartOut_GoogSR, XtestMat_googSR),
-  GoogSR_YhatRF     = predict(rfOut_googSR, XtestMat_googSR),
-  GoogSR_YhatBoost  = predict(boostOutRandom_GoogSR, XtestMat_googSR)
+  YhatMARS   = c(predict(marsOutGoogSR, XtestMat_googSR)),
+  YhatTrees  = predict(rpartOut_GoogSR, XtestMat_googSR),
+  YhatRF     = predict(rfOut_googSR, XtestMat_googSR),
+  YhatBoost  = predict(boostOutRandom_GoogSR, XtestMat_googSR)
 )
 
-
+par(mar=c(7,5,4,2))
 plot(1:length(resultsTest_GoogSR), 
      sapply(resultsTest_GoogSR, function(Yhat){mean((Yhat - Ytest_googSR)^2)}),
      xlab = '', xaxt = 'n', pch = 16, ylab = 'test error', 
@@ -2986,12 +2998,12 @@ table(YhatTestBoost_TslaSRdummy, Ytest_tslaSRdummy)
 
 #Summary - TSLA - Classification
 resultsTestClass_Tsla = data.frame(
-  TslaSRdummy_accuracyFDA,
-  TslaSRdummy_accuracyTree,
-  TslaSRdummy_accuracyRF,
-  TslaSRdummy_accuracyBoost
+  accuracyFDA  = TslaSRdummy_accuracyFDA,
+  accuracyTree = TslaSRdummy_accuracyTree,
+  accuracyRF = TslaSRdummy_accuracyRF,
+  accuracyBoost = TslaSRdummy_accuracyBoost
 )
-
+par(mar=c(7,5,4,2))
 plot(1:length(resultsTestClass_Tsla), 
      resultsTestClass_Tsla,
      xlab = '', xaxt = 'n', pch = 16, ylab = 'accuracy', 
@@ -3037,17 +3049,22 @@ table(YhatTestBoost_GoogSRdummy, Ytest_googSRdummy)
 
 #Summary - GOOG - Classification
 resultsTestClass_Goog = data.frame(
-  GoogSRdummy_accuracyFDA,
-  GoogSRdummy_accuracyTree,
-  GoogSRdummy_accuracyRF,
-  GoogSRdummy_accuracyBoost
+  accuracyFDA   = GoogSRdummy_accuracyFDA,
+  accuracyTree  = GoogSRdummy_accuracyTree,
+  accuracyRF    = GoogSRdummy_accuracyRF,
+  accuracyBoost = GoogSRdummy_accuracyBoost
 )
 
+par(mar=c(7,5,4,2))
 plot(1:length(resultsTestClass_Goog), 
      resultsTestClass_Goog,
-     xlab = '', xaxt = 'n', pch = 16, ylab = 'accuracy', 
+     xlab = '', xaxt = 'n', pch = 16,  ylab = 'accuracy', 
      main = 'GOOG - Supervisor = stock return (dummy)')
 axis(1, labels = names(resultsTestClass_Goog), at = 1:ncol(resultsTestClass_Goog), las = 3)
+
+
+
+
 ```
 
 
