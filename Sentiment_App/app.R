@@ -92,7 +92,7 @@ server <- function(input, output) {
     output$distPlot <- renderPlot({
         validate(need(input$dates[2] > input$dates[1], "End date is earlier than start date."))
         
-        plot_data <- dplyr::filter(Date > input$dates[1] & Date < input$dates[2])
+        plot_data <- plot_data %>% dplyr::filter(Date > input$dates[1] & Date < input$dates[2])
         mu <- plyr::ddply(plot_data, "Ticker", summarise, grp.mean = mean(Sentiment))
         ggplot2::ggplot(data = plot_data, ggplot2::aes(x = Sentiment, fill = Ticker)) + 
             ggplot2::geom_density(alpha = 0.5, adjust = 1.5) + 
