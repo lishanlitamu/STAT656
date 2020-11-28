@@ -387,27 +387,39 @@ corrplot::corrplot(corrGoog, order="hclust")
 
 ```{r nees_scrape}
 ## Guardian API key
-api_key <- "d02efa1b-b4a4-4e20-a7f5-eee62d80cbf6"
+#api_key <- "d02efa1b-b4a4-4e20-a7f5-eee62d80cbf6"
 
 ## Query Guardian for TSLA news
-tsla_news <- GuardianR::get_guardian("Tesla", section = base::c("business", "technology", 
-                                                                "money", "world"), 
-                                     from.date = "2015-10-02", to.date = "2020-09-01", api.key = api_key)
-tsla_news <- tsla_news[, 4:5] # Extract relevant columns only
+#tsla_news <- GuardianR::get_guardian("Tesla", section = base::c("business", "technology", 
+#                                                                "money", "world"), 
+#                                     from.date = "2015-10-02", to.date = "2020-09-01", api.key = api_key)
+#tsla_news <- tsla_news[, 4:5] # Extract relevant columns only
 
 ## Format date column
-tsla_news$webPublicationDate <- base::as.Date(base::substr(tsla_news$webPublicationDate, 1, 10), 
-                                              "%Y-%m-%d")
+#tsla_news$webPublicationDate <- base::as.Date(base::substr(tsla_news$webPublicationDate, 1, 10), 
+#                                              "%Y-%m-%d")
 
 ## Query Guardian for GOOG news
-goog_news <- GuardianR::get_guardian("Alphabet", section = base::c("business", "technology", 
-                                                                   "money", "world"), 
-                                     from.date = "2015-10-02", to.date = "2020-09-01", api.key = api_key)
-goog_news <- goog_news[, 4:5] # Extract relevant columns only
+#goog_news <- GuardianR::get_guardian("Alphabet", section = base::c("business", "technology", 
+#                                                                   "money", "world"), 
+#                                     from.date = "2015-10-02", to.date = "2020-09-01", api.key = api_key)
+#goog_news <- goog_news[, 4:5] # Extract relevant columns only
 
 ## Format date column
-goog_news$webPublicationDate <- base::as.Date(base::substr(goog_news$webPublicationDate, 1, 10), 
-                                              "%Y-%m-%d")
+#goog_news$webPublicationDate <- base::as.Date(base::substr(goog_news$webPublicationDate, 1, 10), 
+#                                              "%Y-%m-%d")
+
+## Pull in news headlines from XLSX
+tsla_news <- readxl::read_excel("tesla news headlines from reuter 09052019-09092020.xlsx")
+goog_news <- readxl::read_excel("alphabet inc. news headlines from reuter 07112019-10302020.xlsx")
+
+## Format date columns
+tsla_news$date <- base::as.Date(tsla_news$date, "%B %d,%Y")
+goog_news$date <- base::as.Date(goog_news$date, "%B %d, %Y")
+
+## Rename headline columns to match previous code
+base::names(tsla_news) <- c("Date", "Time", "webTitle", "Keywords")
+base::names(goog_news) <- c("Date", "Time", "webTitle", "Keywords")
 
 ## Get positive and negative words from Loughran and McDonald
 positive_words <- base::data.frame(
@@ -419,7 +431,7 @@ negative_words <- base::data.frame(
                      sheet = "Negative", col_names = F))$...1
 
 ## Calculate sentiment for TSLA
-tsla_news$Sentiment <- NA
+tsla_news$Sentiment <- base::as.numeric(NA)
 for (row in 1:base::nrow(tsla_news)) {
   tmp <- base::strsplit(tsla_news[row, ]$webTitle, "[[:space:]]|(?=[.!?])", perl = T)[[1]]
   
@@ -437,7 +449,7 @@ for (row in 1:base::nrow(tsla_news)) {
 }
 
 ## Calculate sentiment for GOOG
-goog_news$Sentiment <- NA
+goog_news$Sentiment <- base::as.numeric(NA)
 for (row in 1:base::nrow(goog_news)) {
   tmp <- base::strsplit(goog_news[row, ]$webTitle, "[[:space:]]|(?=[.!?])", perl = T)[[1]]
   
@@ -459,7 +471,7 @@ tsla_news$Ticker <- "TSLA"
 plot_data <- dplyr::bind_rows(goog_news, tsla_news)
 mu <- plyr::ddply(plot_data, "Ticker", summarise, grp.mean = mean(Sentiment))
 ggplot2::ggplot(data = plot_data, ggplot2::aes(x = Sentiment, fill = Ticker)) + 
-  ggplot2::geom_density(alpha = 0.5) + 
+  ggplot2::geom_density(alpha = 0.5, adjust = 1.5) + 
   ggplot2::geom_vline(data = mu, ggplot2::aes(xintercept = grp.mean, color = Ticker),
                       linetype = "dashed") +
   ggplot2::scale_color_manual(values = c("#5f506b", "#86bbbd")) + 
