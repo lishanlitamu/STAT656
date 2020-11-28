@@ -493,15 +493,7 @@ sentiment <- base::data.frame("Ticker" = base::character(),
                               "Date" = base::as.Date(base::character()),
                               "Sentiment" = base::numeric(), stringsAsFactors = F)
 
-<<<<<<< HEAD
 for (index in 1:2) {
-=======
-cl <- parallel::makeCluster(3, setup_strategy = "sequential")
-doParallel::registerDoParallel(cl)
-foreach(index = 1:2) %dopar% {
-## Twitter API keys and secrets
-  library(dplyr)
->>>>>>> 0748580ae32b3df27bebc648e157558c516cd7d1
   tickers <- c("TSLA", "GOOG"); ticker <- tickers[index]
   
   ## Pull tweets (this will throw an authentication page the first time)
