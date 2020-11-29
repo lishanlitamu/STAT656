@@ -469,6 +469,8 @@ ggplot2::ggplot(data = plot_data, ggplot2::aes(x = Sentiment, fill = Ticker)) +
 ### 4 - Twitter Scraping
 
 ```{r twitter_scrape}
+cl = makeCluster(8)
+registerDoParallel(cl)
 ## Twitter API keys and secrets
 api_key <- "zElIwld33bNohcb28j7si3aBW"
 api_secret_key <- "a5yDRmHeFpq2tpqk4u687rAyDuApzUe2ZffYir3disyqa98QGb"
