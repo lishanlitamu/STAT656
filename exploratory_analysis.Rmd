@@ -972,16 +972,20 @@ Up till now, we added xx stock indicators:
 
 
 ```{r assignYandX}
+tslaAddVolTrendRemoveNA = tslaAddVolTrend %>%
+  na.omit(.)
+tslaFullStandardized =  tslaAddVolTrendRemoveNA %>%
+  caret::preProcess(method = c("center","scale")) %>%
+  predict(newdata =tslaAddVolTrendRemoveNA)
+
 ###TSLA
-tslaY  = tslaAddVolTrend %>%
-  na.omit() %>%
-  dplyr::select(Date, diffHighLow, stockReturn) %>%
+tslaY  = tslaFullStandardized %>%
+  dplyr::select(Date,diffHighLow, stockReturn) %>%
   dplyr::as_tibble() %>%
   dplyr::slice(-1) %>%
   mutate(stockReturnDummy = if_else(stockReturn >= 0, 1, 0))
 
-tslaX    = tslaAddVolTrend %>%
-  na.omit() %>%
+tslaX    = tslaFullStandardized %>%
   .[1:(nrow(.)-1),] %>%
   dplyr::as_tibble(.) 
 
@@ -989,7 +993,52 @@ names(tslaY)[2] = "diffHighLowTomorrow" #Y1
 names(tslaY)[3] = "stockReturnTomorrow" #Y2
 names(tslaY)[4] = "stockReturnTomorrowDummy" #Y3
 
-#tslaFull = dplyr::as_tibble(cbind(tslaY,tslaX))
+#####Dummy Variables
+###TSLA
+XtslaAddLevels = tslaFullStandardized %>%
+  mutate(aboveR1 = factor(ifelse(PX_HIGH > R1, "Yes", "No"))) %>%
+  mutate(aboveR2 = factor(ifelse(PX_HIGH > R2, "Yes", "No"))) %>%
+  mutate(aboveR3 = factor(ifelse(PX_HIGH > R3, "Yes", "No"))) %>%
+  mutate(belowS1 = factor(ifelse(PX_LOW  < S1, "Yes", "No"))) %>%
+  mutate(belowS2 = factor(ifelse(PX_LOW  < S2, "Yes", "No"))) %>%
+  mutate(belowS3 = factor(ifelse(PX_LOW  < S3, "Yes", "No"))) %>%
+  select(aboveR1, aboveR2, aboveR3, belowS1, belowS2, belowS3)            
+XtslaDummyModel = caret::dummyVars(~ ., data = XtslaAddLevels, fullRank = TRUE)
+
+
+
+YtslaAddLevels = as_tibble(factor(ifelse(tslaY$stockReturnTomorrow > 0, "Increased", "Decreased"))) 
+YtslaDummyModel = caret::dummyVars(~ ., data = YtslaAddLevels, fullRank = TRUE)
+
+
+
+XtslaDummy = as_tibble(predict(XtslaDummyModel, XtslaAddLevels))
+
+YtslaDummy = as_tibble(predict(YtslaDummyModel, YtslaAddLevels))
+names(YtslaDummy)[1] = "stockReturnTomorrowDummy" #Y2
+
+
+tslaFullWithDummy = tslaFullStandardized %>% 
+  mutate(XtslaDummy) %>% 
+  dplyr::select(-R1,-S1,-R2,-S2,-R3,-S3) %>% 
+  #Drop PP, R1, R2, R3, S1, S2, S3 
+  mutate(YtslaDummy) 
+
+XtslaWithDummy = tslaX %>%
+  mutate(XtslaDummy) %>% 
+  dplyr::select(-R1,-S1,-R2,-S2,-R3,-S3)
+
+XtslaWithoutDummy = tslaX %>%
+  dplyr::select(-R1,-S1,-R2,-S2,-R3,-S3)
+
+YtslaWithDummy = tslaY %>% mutate(YtslaDummy) 
+
+
+
+
+
+
+
 
 #Correlation between stock data of today and difference between highest and lowest stock prices on tomorrow is much higher than correlation between stock data of today and daily stock return on tomorrow. Thus, it's suggested to use "diffHighLowTomorrow " as the supervisor in model fitting.
 
@@ -1050,12 +1099,13 @@ YtslaDummy = as_tibble(predict(YtslaDummyModel, YtslaAddLevels))
 names(YtslaDummy)[1] = "stockReturnTomorrowDummy" #Y2
 
 
+tslaFull = 
 
-#tslaFullWithDummy = tslaFull %>% 
-#  mutate(XtslaDummy) %>% 
-#  dplyr::select(-R1,-S1,-R2,-S2,-R3,-S3) %>% 
-#  #Drop PP, R1, R2, R3, S1, S2, S3 
-#  mutate(YtslaDummy) 
+tslaFullWithDummy = tslaFull %>% 
+  mutate(XtslaDummy) %>% 
+  dplyr::select(-R1,-S1,-R2,-S2,-R3,-S3) %>% 
+  #Drop PP, R1, R2, R3, S1, S2, S3 
+  mutate(YtslaDummy) 
 
 XtslaWithDummy = tslaX %>%
   mutate(XtslaDummy) %>% 
@@ -2008,6 +2058,8 @@ googSentiments = goog_news %>%
 #First, standardize all numeric features
 
 #20190909 - 20200828
+
+
 tslaXStandardized = XtslaWithoutDummy %>% #tslaX contains only numeric features
   caret::preProcess(method = c("center","scale")) %>%
   predict(newdata = XtslaWithoutDummy)
@@ -2015,9 +2067,19 @@ tslaXStandardized = XtslaWithoutDummy %>% #tslaX contains only numeric features
 XtslaStandardizedWithDummy = tslaXStandardized %>%
   cbind(.,XtslaDummy) #add dummy variables back to data set
 
-XtslaWithSentiments = merge(XtslaStandardizedWithDummy,tslaSentiments)
-YtslaAlignedWithSentiments = merge(YtslaWithDummy, tslaSentiments)
+tslaYnumeric = tslaY %>% select(diffHighLowTomorrow, stockReturnTomorrow)
+YtslaStandardizedWithDummy = tslaYnumeric %>%
+  caret::preProcess(method = c("center","scale")) %>%
+  predict(newdata = tslaYnumeric) %>%
+  cbind(.,YtslaDummy) #add dummy variables back to data set
 
+XtslaWithSentiments = merge(XtslaWithoutDummy,tslaSentiments)
+YtslaWithSentiments = merge(YtslaStandardizedWithDummy, tslaSentiments)[2:235,]
+YtslaAligned        = YtslaWithSentiments %>%
+                      select("diffHighLowTomorrow","stockReturnTomorrow",
+                             "stockReturnTomorrowDummy")
+
+colnames(YtslaWithSentiments)
 tslaYnumeric = tslaY %>% select(diffHighLowTomorrow, stockReturnTomorrow)
 YtslaStandardizedWithDummy = tslaYnumeric %>%
   caret::preProcess(method = c("center","scale")) %>%
