@@ -902,12 +902,12 @@ addDiffVarF = function(dataForModification,nColumn) {
 tslaSentiments = tsla_news %>%
   group_by(Date) %>%
   summarise(tslaSentimentsSum = sum(Sentiment, na.rm = TRUE),
-                                mean(Sentiment, na.rm = TRUE))
+            tslaSentimentsMean = mean(Sentiment, na.rm = TRUE))
 
 googSentiments = goog_news %>%
   group_by(Date) %>%
   summarise(googSentimentsSum = sum(Sentiment, na.rm = TRUE), 
-                                mean(Sentiment, na.rm = TRUE))
+            googSentimentsMean = mean(Sentiment, na.rm = TRUE))
 ```
 
 ```{r assignYandX}
@@ -946,7 +946,6 @@ XtslaAddLevels = tslaX %>%
   select(aboveR1, aboveR2, aboveR3, belowS1, belowS2, belowS3)            
 XtslaDummyModel = caret::dummyVars(~ ., data = XtslaAddLevels, fullRank = TRUE)
 
-nrow(XtslaAddLevels)
 
 YtslaAddLevels = as_tibble(factor(ifelse(tslaY$stockReturnTomorrow > 0, "Increased", "Decreased"))) 
 YtslaDummyModel = caret::dummyVars(~ ., data = YtslaAddLevels, fullRank = TRUE)
@@ -993,24 +992,29 @@ YtslaWithSentiments = tslaFullWithSentiments %>%
 
 
 ##GOOG
-googY  = googAddVolTrend %>%
-  na.omit() %>%
-  dplyr::select(diffHighLow, stockReturn) %>%
+
+googAddVolTrendRemoveNA = googAddVolTrend %>%
+  na.omit(.)
+googFullStandardized =  googAddVolTrendRemoveNA %>%
+  caret::preProcess(method = c("center","scale")) %>%
+  predict(newdata =googAddVolTrendRemoveNA)
+
+googY  = googFullStandardized %>%
+  dplyr::select(Date,diffHighLow, stockReturn) %>%
   dplyr::as_tibble() %>%
   dplyr::slice(-1) %>%
   mutate(stockReturnDummy = if_else(stockReturn >= 0, 1, 0))
 
-
-googX    = googAddVolTrend %>%
-  na.omit() %>%
+googX    = googFullStandardized %>%
   .[1:(nrow(.)-1),] %>%
   dplyr::as_tibble(.) 
 
-names(googY)[1] = "diffHighLowTomorrow" #Y1
-names(googY)[2] = "stockReturnTomorrow" #Y2
-names(googY)[3] = "stockReturnTomorrowDummy" #Y3
+names(googY)[2] = "diffHighLowTomorrow" #Y1
+names(googY)[3] = "stockReturnTomorrow" #Y2
+names(googY)[4] = "stockReturnTomorrowDummy" #Y3
 
-googFull = dplyr::as_tibble(cbind(googY,googX))
+#####Dummy Variables
+
 ###GOOG
 XgoogAddLevels = googX %>%
   mutate(aboveR1 = factor(ifelse(PX_HIGH > R1, "Yes", "No"))) %>%
@@ -1028,21 +1032,11 @@ YgoogAddLevels = as_tibble(factor(ifelse(googY$stockReturnTomorrow > 0, "Increas
 YgoogDummyModel = caret::dummyVars(~ ., data = YgoogAddLevels, fullRank = TRUE)
 
 
-
 XgoogDummy = as_tibble(predict(XgoogDummyModel, XgoogAddLevels))
 YgoogDummy = as_tibble(predict(YgoogDummyModel, YgoogAddLevels))
 
-
-
 names(YgoogDummy)[1] = "stockReturnTomorrowDummy" #Y2
 
-
-
-googFullWithDummy = googFull %>% 
-  mutate(XgoogDummy) %>% 
-  dplyr::select(-R1,-S1,-R2,-S2,-R3,-S3) %>% 
-  #Drop PP, R1, R2, R3, S1, S2, S3 
-  mutate(YgoogDummy) 
 
 XgoogWithDummy = googX %>%
   mutate(XgoogDummy) %>% 
@@ -1052,178 +1046,93 @@ XgoogWithoutDummy = googX %>%
   dplyr::select(-R1,-S1,-R2,-S2,-R3,-S3)
 
 YgoogWithDummy = googY %>% mutate(YgoogDummy) 
+
+#X:20190711 - 20200828
+#Y:20190712 - 20200831
+
+XgoogWithDummy_subset = XgoogWithDummy[1306:nrow(XgoogWithDummy),] 
+YgoogWithDummy_subset = YgoogWithDummy[1306:nrow(YgoogWithDummy),]
+YgoogWithDummy_subsetWithoutDate = YgoogWithDummy_subset[,-1]
+
+googFull = cbind(YgoogWithDummy_subsetWithoutDate,XgoogWithDummy_subset) 
+googFullWithSentiments = merge(googFull,googSentiments)
+
+XgoogWithSentiments = googFullWithSentiments %>%
+  select(-c(Date,diffHighLowTomorrow,stockReturnTomorrow,stockReturnTomorrowDummy))
+YgoogWithSentiments = googFullWithSentiments %>%
+  select(c(Date,diffHighLowTomorrow,stockReturnTomorrow,stockReturnTomorrowDummy))
 ```
 
 
 ###### 7 - Final Task without sentiments (updated from Task 3) 
-```{r dataTransformation Task3}
-#See {r dummyVarForLogisticRegression}
-####TSLA
-#Feature transformations
-#First, standardize all numeric features
 
-#20190909 - 20200828
-
-
-tslaXStandardized = XtslaWithoutDummy %>% #tslaX contains only numeric features
-  caret::preProcess(method = c("center","scale")) %>%
-  predict(newdata = XtslaWithoutDummy)
-
-XtslaStandardizedWithDummy = tslaXStandardized %>%
-  cbind(.,XtslaDummy) #add dummy variables back to data set
-
-tslaYnumeric = tslaY %>% select(diffHighLowTomorrow, stockReturnTomorrow)
-YtslaStandardizedWithDummy = tslaYnumeric %>%
-  caret::preProcess(method = c("center","scale")) %>%
-  predict(newdata = tslaYnumeric) %>%
-  cbind(.,YtslaDummy) #add dummy variables back to data set
-
-XtslaWithSentiments = merge(XtslaWithoutDummy,tslaSentiments)
-YtslaWithSentiments = merge(YtslaStandardizedWithDummy, tslaSentiments)[2:235,]
-YtslaAligned        = YtslaWithSentiments %>%
-                      select("diffHighLowTomorrow","stockReturnTomorrow",
-                             "stockReturnTomorrowDummy")
-
-colnames(YtslaWithSentiments)
-tslaYnumeric = tslaY %>% select(diffHighLowTomorrow, stockReturnTomorrow)
-YtslaStandardizedWithDummy = tslaYnumeric %>%
-  caret::preProcess(method = c("center","scale")) %>%
-  predict(newdata = tslaYnumeric) %>%
-  cbind(.,YtslaDummy) #add dummy variables back to data set
-
-highCorrTsla = highCorrF(XtslaStandardizedWithDummy,0.8)
-XtslaLinear = XtslaStandardizedWithDummy %>% select(-highCorrTsla)
-        #Standardized, WithDummy, RemoveCorr
-
-####GOOG
-#Feature transformations
-#First, standardize all numeric features
-googXStandardized = XgoogWithoutDummy %>% #tslaX contains only numeric features
-  caret::preProcess(method = c("center","scale")) %>%
-  predict(newdata = XgoogWithoutDummy)
-
-XgoogStandardizedWithDummy = googXStandardized %>%
-  cbind(.,XgoogDummy) #add dummy variables back to data set
-
-googYnumeric = googY %>% select(diffHighLowTomorrow, stockReturnTomorrow)
-YgoogStandardizedWithDummy = googYnumeric %>%
-  caret::preProcess(method = c("center","scale")) %>%
-  predict(newdata = googYnumeric) %>%
-  cbind(.,YgoogDummy) #add dummy variables back to data set
-
-  
-highCorrGoog = highCorrF(XgoogStandardizedWithDummy,0.8)
-XgoogLinear = XgoogStandardizedWithDummy %>% select(-highCorrGoog)
-        #Standardized, WithDummy, RemoveCorr
-
-#XtslaStandardizedWithDummy
-#YtslaStandardizedWithDummy
-#XgoogStandardizedWithDummy
-#YgoogStandardizedWithDummy
-```
-
-```{r dataSplitTask3}
+```{r dataSplitFinalTask}
 #Line 990
 #Superviors:
-  #Y1: YtslaStandardizedWithDummy$diffHighLowTomorrow
-  #Y2: YtslaStandardizedWithDummy$stockReturnTomorrow
-  #Y3: YtslaStandardizedWithDummy$stockReturnTomorrowDummy
+  #Y1: YtslaWithSentiments$diffHighLowTomorrow
+  #Y2: YtslaWithSentiments$stockReturnTomorrow
+  #Y3: YtslaWithSentiments$stockReturnTomorrowDummy
 
-#Features:
-  #XtslaStandardizedWithDummy
+#Features wtihtout Sentiments:
+XtslaWithoutSentiments = XtslaWithSentiments %>%
+  select(-c(tslaSentimentsSum,tslaSentimentsMean))
+XgoogWithoutSentiments = XgoogWithSentiments %>%
+  select(-c(googSentimentsSum,googSentimentsMean))
 
-#Full set:
-  #tslaFull
+#Data Split
+##TSLA
 
 set.seed(2020)
-inTrain_tslaHL = caret::createDataPartition(YtslaStandardizedWithDummy$diffHighLowTomorrow, p = 3/4, list = FALSE) #Y1
-inTrain_tslaSR = caret::createDataPartition(YtslaStandardizedWithDummy$stockReturnTomorrow, p = 3/4, list = FALSE) #Y2
-inTrain_tslaSRdummy = caret::createDataPartition(YtslaStandardizedWithDummy$stockReturnTomorrowDummy, p = 3/4, list = FALSE) #Y3
+inTrain_tslaHL = caret::createDataPartition(YtslaWithSentiments$diffHighLowTomorrow, p = 4/5, list = FALSE) #Y1
+inTrain_tslaSR = caret::createDataPartition(YtslaWithSentiments$stockReturnTomorrow, p = 4/5, list = FALSE) #Y2
+inTrain_tslaSRdummy = caret::createDataPartition(YtslaWithSentiments$stockReturnTomorrowDummy, p = 4/5, list = FALSE) #Y3
 
-Ytrain_tslaHL = YtslaStandardizedWithDummy$diffHighLowTomorrow[inTrain_tslaHL]
-Ytest_tslaHL  = YtslaStandardizedWithDummy$diffHighLowTomorrow[-inTrain_tslaHL]
-Ytrain_tslaSR = YtslaStandardizedWithDummy$stockReturnTomorrow[inTrain_tslaSR]
-Ytest_tslaSR  = YtslaStandardizedWithDummy$stockReturnTomorrow[-inTrain_tslaSR]
-Ytrain_tslaSRdummy = YtslaStandardizedWithDummy$stockReturnTomorrowDummy[inTrain_tslaSRdummy]
-Ytest_tslaSRdummy  = YtslaStandardizedWithDummy$stockReturnTomorrowDummy[-inTrain_tslaSRdummy]
 
-Xtrain_tslaHL = XtslaStandardizedWithDummy[inTrain_tslaHL,] 
-Xtest_tslaHL  = XtslaStandardizedWithDummy[-inTrain_tslaHL,]
-Xtrain_tslaSR = XtslaStandardizedWithDummy[inTrain_tslaSR,] 
-Xtest_tslaSR  = XtslaStandardizedWithDummy[-inTrain_tslaSR,]
-Xtrain_tslaSRdummy = XtslaStandardizedWithDummy[inTrain_tslaSRdummy,]
-Xtest_tslaSRdummy  = XtslaStandardizedWithDummy[-inTrain_tslaSRdummy,]
+Ytrain_tslaHL = YtslaWithSentiments$diffHighLowTomorrow[inTrain_tslaHL]
+Ytest_tslaHL  = YtslaWithSentiments$diffHighLowTomorrow[-inTrain_tslaHL]
+Ytrain_tslaSR = YtslaWithSentiments$stockReturnTomorrow[inTrain_tslaSR]
+Ytest_tslaSR  = YtslaWithSentiments$stockReturnTomorrow[-inTrain_tslaSR]
+Ytrain_tslaSRdummy = YtslaWithSentiments$stockReturnTomorrowDummy[inTrain_tslaSRdummy]
+Ytest_tslaSRdummy  = YtslaWithSentiments$stockReturnTomorrowDummy[-inTrain_tslaSRdummy]
+
+
+Xtrain_tslaHL = XtslaWithoutSentiments[inTrain_tslaHL,] 
+Xtest_tslaHL  = XtslaWithoutSentiments[-inTrain_tslaHL,]
+Xtrain_tslaSR = XtslaWithoutSentiments[inTrain_tslaSR,] 
+Xtest_tslaSR  = XtslaWithoutSentiments[-inTrain_tslaSR,]
+Xtrain_tslaSRdummy = XtslaWithoutSentiments[inTrain_tslaSRdummy,]
+Xtest_tslaSRdummy  = XtslaWithoutSentiments[-inTrain_tslaSRdummy,]
 
 ###GOOG
-inTrain_googHL = caret::createDataPartition(YgoogStandardizedWithDummy$diffHighLowTomorrow, p = 3/4, list = FALSE) #Y1
-inTrain_googSR = caret::createDataPartition(YgoogStandardizedWithDummy$stockReturnTomorrow, p = 3/4, list = FALSE) #Y2
-inTrain_googSRdummy = caret::createDataPartition(YgoogStandardizedWithDummy$stockReturnTomorrowDummy, p = 3/4, list = FALSE) #Y3
 
-Ytrain_googHL = YgoogStandardizedWithDummy$diffHighLowTomorrow[inTrain_googHL]
-Ytest_googHL  = YgoogStandardizedWithDummy$diffHighLowTomorrow[-inTrain_googHL]
-Ytrain_googSR = YgoogStandardizedWithDummy$stockReturnTomorrow[inTrain_googSR]
-Ytest_googSR  = YgoogStandardizedWithDummy$stockReturnTomorrow[-inTrain_googSR]
-Ytrain_googSRdummy = YgoogStandardizedWithDummy$stockReturnTomorrowDummy[inTrain_googSRdummy]
-Ytest_googSRdummy  = YgoogStandardizedWithDummy$stockReturnTomorrowDummy[-inTrain_googSRdummy]
+set.seed(2020)
+inTrain_googHL = caret::createDataPartition(YgoogWithSentiments$diffHighLowTomorrow, p = 4/5, list = FALSE) #Y1
+inTrain_googSR = caret::createDataPartition(YgoogWithSentiments$stockReturnTomorrow, p = 4/5, list = FALSE) #Y2
+inTrain_googSRdummy = caret::createDataPartition(YgoogWithSentiments$stockReturnTomorrowDummy, p = 4/5, list = FALSE) #Y3
 
-Xtrain_googHL = XgoogStandardizedWithDummy[inTrain_googHL,]
-Xtest_googHL  = XgoogStandardizedWithDummy[-inTrain_googHL,]
-Xtrain_googSR = XgoogStandardizedWithDummy[inTrain_googSR,]
-Xtest_googSR  = XgoogStandardizedWithDummy[-inTrain_googSR,]
-Xtrain_googSRdummy = XgoogStandardizedWithDummy[inTrain_googSRdummy,]
-Xtest_googSRdummy  = XgoogStandardizedWithDummy[-inTrain_googSRdummy,]
+
+Ytrain_googHL = YgoogWithSentiments$diffHighLowTomorrow[inTrain_googHL]
+Ytest_googHL  = YgoogWithSentiments$diffHighLowTomorrow[-inTrain_googHL]
+Ytrain_googSR = YgoogWithSentiments$stockReturnTomorrow[inTrain_googSR]
+Ytest_googSR  = YgoogWithSentiments$stockReturnTomorrow[-inTrain_googSR]
+Ytrain_googSRdummy = YgoogWithSentiments$stockReturnTomorrowDummy[inTrain_googSRdummy]
+Ytest_googSRdummy  = YgoogWithSentiments$stockReturnTomorrowDummy[-inTrain_googSRdummy]
+
+
+Xtrain_googHL = XgoogWithoutSentiments[inTrain_googHL,]
+Xtest_googHL  = XgoogWithoutSentiments[-inTrain_googHL,]
+Xtrain_googSR = XgoogWithoutSentiments[inTrain_googSR,]
+Xtest_googSR  = XgoogWithoutSentiments[-inTrain_googSR,]
+Xtrain_googSRdummy = XgoogWithoutSentiments[inTrain_googSRdummy,]
+Xtest_googSRdummy  = XgoogWithoutSentiments[-inTrain_googSRdummy,]
 
 ```
 
-```{r dataReview}
-####TSLA
-caret::featurePlot(Xtrain_tslaHL[,1:10], Ytrain_tslaHL)
-caret::featurePlot(Xtrain_tslaSR[,1:10], Ytrain_tslaSR)
-caret::featurePlot(Xtrain_tslaSRdummy[,1:10], Ytrain_tslaSRdummy)
 
-caret::featurePlot(Xtrain_tslaHL[,11:20], Ytrain_tslaHL)
-caret::featurePlot(Xtrain_tslaSR[,11:20], Ytrain_tslaSR)
-caret::featurePlot(Xtrain_tslaSRdummy[,11:20], Ytrain_tslaSRdummy)
-
-caret::featurePlot(Xtrain_tslaHL[,21:30], Ytrain_tslaHL)
-caret::featurePlot(Xtrain_tslaSR[,21:30], Ytrain_tslaSR)
-caret::featurePlot(Xtrain_tslaSRdummy[,21:30], Ytrain_tslaSRdummy)
-
-caret::featurePlot(Xtrain_tslaHL[,31:40], Ytrain_tslaHL)
-caret::featurePlot(Xtrain_tslaSR[,31:40], Ytrain_tslaSR)
-caret::featurePlot(Xtrain_tslaSRdummy[,31:40], Ytrain_tslaSRdummy)
-
-caret::featurePlot(Xtrain_tslaHL[,41:56], Ytrain_tslaHL)
-caret::featurePlot(Xtrain_tslaSR[,41:56], Ytrain_tslaSR)
-caret::featurePlot(Xtrain_tslaSRdummy[,41:56], Ytrain_tslaSRdummy)
-
-
-####GOOG
-caret::featurePlot(Xtrain_googHL[,1:10], Ytrain_googHL)
-caret::featurePlot(Xtrain_googSR[,1:10], Ytrain_googSR)
-caret::featurePlot(Xtrain_googSRdummy[,1:10], Ytrain_googSRdummy)
-
-caret::featurePlot(Xtrain_googHL[,11:20], Ytrain_googHL)
-caret::featurePlot(Xtrain_googSR[,11:20], Ytrain_googSR)
-caret::featurePlot(Xtrain_googSRdummy[,11:20], Ytrain_googSRdummy)
-
-caret::featurePlot(Xtrain_googHL[,21:30], Ytrain_googHL)
-caret::featurePlot(Xtrain_googSR[,21:30], Ytrain_googSR)
-caret::featurePlot(Xtrain_googSRdummy[,21:30], Ytrain_googSRdummy)
-
-caret::featurePlot(Xtrain_googHL[,31:40], Ytrain_googHL)
-caret::featurePlot(Xtrain_googSR[,31:40], Ytrain_googSR)
-caret::featurePlot(Xtrain_googSRdummy[,31:40], Ytrain_googSRdummy)
-
-caret::featurePlot(Xtrain_googHL[,41:54], Ytrain_googHL)
-caret::featurePlot(Xtrain_googSR[,41:54], Ytrain_googSR)
-caret::featurePlot(Xtrain_googSRdummy[,41:54], Ytrain_googSRdummy)
-```
-
-```{r setupTask3}
+```{r setupFinalTask}
 
 #Repeated cross validation
-trControl = caret::trainControl(method = "repeatedcv", repeats = 2, number = 10)
+trControl = caret::trainControl(method = "repeatedcv", repeats = 5, number = 10)
 
 XtrainMat_tslaHL      = as.matrix(Xtrain_tslaHL)
 XtestMat_tslaHL       = as.matrix(Xtest_tslaHL)
@@ -1242,17 +1151,18 @@ XtrainMat_googSRdummy = as.matrix(Xtrain_googSRdummy)
 XtestMat_googSRdummy  = as.matrix(Xtest_googSRdummy)
 
 #Parallelism
-cl = parallel::makeCluster(2)
-doParallel::registerDoParallel(cl)
+#cl = parallel::makeCluster(8)
+#doParallel::registerDoParallel(cl)
 ```
 
 
-```{r linearTuningParameters}
+```{r elasticNetTuningParameters}
 set.seed(2020)
-
-####Supervisor Y1 = YtslaStandardizedWithDummy$diffHighLowTomorrow
+cl = parallel::makeCluster(8)
+doParallel::registerDoParallel(cl)
+####Supervisor Y1 = YtslaWithSentiments$diffHighLowTomorrow
 ####TSLA
-trControl = caret::trainControl(method = "repeatedcv", repeats = 2, number = 10)
+trControl = caret::trainControl(method = "repeatedcv", repeats = 5, number = 10)
 
 lassoGridTslaHL = expand.grid(lambda = c(0.0001,0.001, 0.01, 0.05, 0.1, 0.2),
                             alpha = c(0.05,0.5,1))
@@ -1279,7 +1189,7 @@ plot(elasticOutGoogHL, main = "Elastic Net - GOOG diffHighLow")
 
 
 
-####Supervisor Y2 = YtslaStandardizedWithDummy$stockReturnTomorrow
+####Supervisor Y2 = YtslaWithSentiments$stockReturnTomorrow
 ####TSLA
 #trControl = caret::trainControl(method = "repeatedcv", repeats = 2, number = 10)
 
@@ -1321,14 +1231,14 @@ row.names(tunePara) = c("TSLA - diffHighLow", "TSLA - stockReturn",
 knitr::kable(
  tunePara,
  col.names = c("alpha","lambda"),
- caption   = "Table 1: Optimal tuning parameters for linear regression",
+ caption   = "Table 1: Optimal tuning parameters for Elastic Penalized  regression",
  align     = "lccrr"
 )
 
 ```
 
 
-```{r linearModelPenalized}
+```{r elasticNet}
 ####Supervisor Y1 = YtslaStandardizedWithDummy$diffHighLowTomorrow
 ####TSLA
 glmnetOutTslaHL       = glmnet(x = XtrainMat_tslaHL, y = Ytrain_tslaHL, 
@@ -1388,14 +1298,13 @@ plot(YhatTrainGlmnetGoogSR, residualsGoogSR,
 ####Logistic Classification
 ```{r logisticClassification}
 set.seed(2020)
-K = 10
-trainControl = trainControl(method = 'cv', number = K)
+trControl = caret::trainControl(method = "repeatedcv", repeats = 5, number = 10)
 tuneGridTslaSRdummy = expand.grid('alpha' = c(0,.25,.5,.75,1),
                                   'lambda' = seq(0.000001, .001, length.out = 30))
 elasticOutTslaSRdummy = train(x = Xtrain_tslaSRdummy, 
                               y = as.factor(Ytrain_tslaSRdummy),
                               method = 'glmnet',
-                              trControl = trainControl, 
+                              trControl = trControl, 
                               tuneGrid = tuneGridTslaSRdummy)
 elasticOutTslaSRdummy$bestTune$alpha
 
@@ -1430,14 +1339,13 @@ plot(rocOut_TslaSRdummy, main = "ROC Plot - TSLA Stock Return (Dummy)")
 
 ####GOOG
 set.seed(2020)
-K = 10
-trainControl = trainControl(method = 'cv', number = K)
+
 tuneGridGoogSRdummy = expand.grid('alpha' = c(0,.25,.5,.75,1),
                                   'lambda' = seq(0.000001, .001, length.out = 30))
 elasticOutGoogSRdummy = train(x = Xtrain_googSRdummy, 
                               y = as.factor(Ytrain_googSRdummy),
                               method = 'glmnet',
-                              trControl = trainControl, 
+                              trControl = trControl, 
                               tuneGrid = tuneGridGoogSRdummy)
 elasticOutGoogSRdummy$bestTune$alpha
 
@@ -1494,7 +1402,7 @@ knitr::kable(
 ####MARS
 ```{r MARS_Task3}
 set.seed(2020)
-#trControl = caret::trainControl(method = "repeatedcv", repeats = 2, number = 10)
+#trControl = caret::trainControl(method = "repeatedcv", repeats = 5, number = 10)
 
 ###TSLA
 tuneGridTslaHL      = expand.grid(degree = 1:3,
@@ -1530,6 +1438,7 @@ Ytrain_tslaSRdummy_ = relevel(Ytrain_tslaSRdummy_, ref = '0')
 
 
 levels(Ytrain_tslaSRdummy_) = c("No", "Yes")
+
 marsOutTslaSRdummy = train(x = XtrainMat_tslaSRdummy, 
                            y = Ytrain_tslaSRdummy_,
                       method = 'fda',
@@ -1660,8 +1569,10 @@ plot(marsGoogSRdummyvip)
 
 ```{r classificationTree}
 set.seed(2022)
+cl = parallel::makeCluster(8)
+doParallel::registerDoParallel(cl)
 ####TSLA
-#trControl = caret::trainControl(method = "repeatedcv", repeats = 2, 
+#trControl = caret::trainControl(method = "repeatedcv", repeats = 5, 
 #                                number = 10, classProbs = TRUE)
 #Y1
 tuneGridTree_TslaHL = expand.grid(cp = c(0.0001,0.001,0.01,0.1,0.15,0.5,1))
@@ -1700,7 +1611,7 @@ text(rpartOut_TslaSRdummy$finalModel, cex = 0.6, digits = 1)
 
 
 ####GOOG
-#trControl = caret::trainControl(method = "repeatedcv", repeats = 2, 
+#trControl = caret::trainControl(method = "repeatedcv", repeats = 5, 
                                # number = 10, classProbs = TRUE)
 #Y1
 tuneGridTree_GoogHL = expand.grid(cp = c(0,0.0001,0.001,0.01,0.1,0.15,0.5,1))
@@ -1746,9 +1657,11 @@ rpartOut_GoogSRdummy$finalModel
 
 ```{r randomForest}
 set.seed(2020)
+cl = parallel::makeCluster(8)
+doParallel::registerDoParallel(cl)
 ####TSLA
-trControl = caret::trainControl(method = "repeatedcv", repeats = 2, 
-                                number = 10, classProbs = TRUE)
+#trControl = caret::trainControl(method = "repeatedcv", repeats = 5, 
+#                                number = 10, classProbs = TRUE)
 #Y1
 tuneGridRanger_TslaHL = data.frame(splitrule = "variance", min.node.size = 5,
                                    mtry = round(sqrt(ncol(Xtrain_tslaHL))))
@@ -1772,10 +1685,10 @@ rfOut_tslaSR  = train(x = XtrainMat_tslaSR, y = Ytrain_tslaSR,
 rfOut_tslaSR$finalModel
 
 #Y3
-tuneGridRanger_TslaSRdummy = data.frame(splitrule = "gini", min.node.size = 5,
+tuneGridRanger_TslaSRdummy = data.frame(splitrule = "gini", min.node.size = 10,
                                    mtry = round(sqrt(ncol(Xtrain_tslaSRdummy))))
 rfOut_tslaSRdummy  = train(x = XtrainMat_tslaSRdummy, 
-                           y = as.matrix(Ytrain_tslaSRdummy_) , 
+                           y = as.matrix(Ytrain_tslaSRdummy) , 
                       method = "ranger",
                       num.trees = 500,
                       tuneGrid = tuneGridRanger_TslaSRdummy, 
@@ -1784,7 +1697,7 @@ rfOut_tslaSRdummy  = train(x = XtrainMat_tslaSRdummy,
 rfOut_tslaSRdummy$finalModel
 
 ####GOOG
-#trControl = caret::trainControl(method = "repeatedcv", repeats = 2, 
+#trControl = caret::trainControl(method = "repeatedcv", repeats = 5, 
 #                                number = 10, classProbs = TRUE)
 #Y1
 tuneGridRanger_GoogHL = data.frame(splitrule = "variance", min.node.size = 5,
@@ -1806,10 +1719,12 @@ rfOut_googSR  = train(x = XtrainMat_googSR, y = Ytrain_googSR,
                       tuneGrid = tuneGridRanger_GoogSR, 
                       importance = "permutation",
                       trControl = trControl)
-rfOut_googSR$finalM
+rfOut_googSR$finalModel
 
 #Y3
-tuneGridRanger_GoogSRdummy = data.frame(splitrule = "gini", min.node.size = 5,
+head(Ytrain_googSRdummy_)
+length(Ytrain_googSRdummy_)
+tuneGridRanger_GoogSRdummy = data.frame(splitrule = "gini", min.node.size = 10,
                                    mtry = round(sqrt(ncol(Xtrain_googSRdummy))))
 rfOut_googSRdummy  = train(x = XtrainMat_googSRdummy, y =as.matrix(Ytrain_googSRdummy_), 
                       method = "ranger",
@@ -1848,15 +1763,17 @@ knitr::kable(
 
 ```{r boosting}
 set.seed(2020)
+cl = parallel::makeCluster(8)
+doParallel::registerDoParallel(cl)
 ####TSLA
 #Y1
-tuneGridRandom_TslaHL = data.frame('nrounds'= c(50,150,500,1000,2000,3000),
+tuneGridRandom_TslaHL = expand.grid('nrounds'= c(50,150,500,1000,2000,3000),
                                    'max_depth' = 6,
-                                   'eta' = 0.05,
+                                   'eta' = c(0.01,0.03,0.05),
                                    'gamma' = 0,
                                    'colsample_bytree' = 1,
                                    'min_child_weight' = 0,
-                                   'subsample' = 0.5)
+                                   'subsample' = c(0.5, 0.8))
 
 boostOutRandom_TslaHL = train(x = Xtrain_tslaHL, y = Ytrain_tslaHL,
                               method = 'xgbTree', verbose = 0,
@@ -1865,13 +1782,14 @@ boostOutRandom_TslaHL = train(x = Xtrain_tslaHL, y = Ytrain_tslaHL,
 plot(boostOutRandom_TslaHL)
 
 #Y2
-tuneGridRandom_TslaSR = data.frame('nrounds'= c(1,5,10,15,25,35,45,50,55),
+
+tuneGridRandom_TslaSR = expand.grid('nrounds'= c(50,150,500,1000,2000,3000),
                                    'max_depth' = 6,
-                                   'eta' = 0.05,
+                                   'eta' = c(0.01,0.03,0.05),
                                    'gamma' = 0,
                                    'colsample_bytree' = 1,
                                    'min_child_weight' = 0,
-                                   'subsample' = 0.5)
+                                   'subsample' = c(0.5, 0.8))
 
 boostOutRandom_TslaSR = train(x = Xtrain_tslaSR, y = Ytrain_tslaSR,
                               method = 'xgbTree', verbose = 0,
@@ -1881,14 +1799,16 @@ plot(boostOutRandom_TslaSR)
 boostOutRandom_TslaSR$bestTune$nrounds
 
 #Y3
-tuneGridRandom_TslaSRdummy = data.frame(
-                                   'nrounds'= c(50,150,500,1000,2000,3000,4000),
+cl = parallel::makeCluster(8)
+doParallel::registerDoParallel(cl)
+tuneGridRandom_TslaSRdummy = expand.grid(
+                                   'nrounds'= c(50,150,500,1000,2000,3000),
                                    'max_depth' = 6,
-                                   'eta' = 0.05,
+                                   'eta' = c(0.01,0.03,0.05),
                                    'gamma' = 0,
                                    'colsample_bytree' = 1,
                                    'min_child_weight' = 0,
-                                   'subsample' = 0.5)
+                                   'subsample' = c(0.5, 0.8))
 
 boostOutRandom_TslaSRdummy = train(x = Xtrain_tslaSRdummy, 
                                    y = Ytrain_tslaSRdummy_,
@@ -1904,13 +1824,13 @@ plot(boostOutRandom_TslaSRdummy)
 
 ####GOOG
 #Y1
-tuneGridRandom_GoogHL = data.frame('nrounds'= c(5,25,50,60,65,70,75,80,100),
+tuneGridRandom_GoogHL = expand.grid('nrounds'= c(50,150,500,1000,2000,3000),
                                    'max_depth' = 6,
-                                   'eta' = 0.05,
+                                   'eta' = c(0.01,0.03,0.05),
                                    'gamma' = 0,
                                    'colsample_bytree' = 1,
                                    'min_child_weight' = 0,
-                                   'subsample' = 0.5)
+                                   'subsample' = c(0.5, 0.8))
 
 boostOutRandom_GoogHL = train(x = Xtrain_googHL, y = Ytrain_googHL,
                               method = 'xgbTree', verbose = 0,
@@ -1919,13 +1839,13 @@ boostOutRandom_GoogHL = train(x = Xtrain_googHL, y = Ytrain_googHL,
 plot(boostOutRandom_GoogHL)
 
 #Y2
-tuneGridRandom_GoogSR = data.frame('nrounds'= c(1,5,10,15,25,35,45,50,55,100),
+tuneGridRandom_GoogSR = expand.grid('nrounds'= c(50,150,500,1000,2000,3000),
                                    'max_depth' = 6,
-                                   'eta' = 0.05,
+                                   'eta' = c(0.01,0.03,0.05),
                                    'gamma' = 0,
                                    'colsample_bytree' = 1,
                                    'min_child_weight' = 0,
-                                   'subsample' = 0.5)
+                                   'subsample' = c(0.5, 0.8))
 
 boostOutRandom_GoogSR = train(x = Xtrain_googSR, y = Ytrain_googSR,
                               method = 'xgbTree', verbose = 0,
@@ -1935,14 +1855,14 @@ plot(boostOutRandom_GoogSR)
 boostOutRandom_GoogSR$bestTune$nrounds
 
 #Y3
-tuneGridRandom_GoogSRdummy = data.frame(
-                                   'nrounds'= c(50,1500,2000,3000,3500,4000),
+tuneGridRandom_GoogSRdummy = expand.grid(
+                                   'nrounds'= c(50,150,500,1000,2000,3000),
                                    'max_depth' = 6,
-                                   'eta' = 0.05,
+                                   'eta' = c(0.01,0.03,0.05),
                                    'gamma' = 0,
                                    'colsample_bytree' = 1,
                                    'min_child_weight' = 0,
-                                   'subsample' = 0.5)
+                                   'subsample' = c(0.5, 0.8))
 
 boostOutRandom_GoogSRdummy = train(x = Xtrain_googSRdummy, 
                                    y = Ytrain_googSRdummy_,
@@ -2107,9 +2027,9 @@ table(YhatTestTree_TslaSRdummy, Ytest_tslaSRdummy)
 (TslaSRdummy_accuracyTree = sum(diag(table(YhatTestTree_TslaSRdummy, Ytest_tslaSRdummy)))/length(Ytest_tslaSRdummy))
 
 #TSLA Random Forest - Y3
-YhatTestRF_TslaSRdummyProb = predict(rfOut_tslaSRdummy, Xtest_tslaSRdummy,
-                                  type = 'prob')
 
+YhatTestRF_TslaSRdummyProb = predict(rfOut_tslaSRdummy, XtestMat_tslaSRdummy,
+                                  type = 'prob')
 YhatTestRF_TslaSRdummy     = ifelse(YhatTestRF_TslaSRdummyProb[,2] > 0.5, '1','0')
 
 table(YhatTestRF_TslaSRdummy, Ytest_tslaSRdummy)
