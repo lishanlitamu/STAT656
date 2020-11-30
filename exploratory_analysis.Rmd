@@ -543,49 +543,6 @@ ggplot2::ggplot(sentiment, ggplot2::aes(x = Date, y = Sentiment, color = Ticker)
 
 
 
-
-#delete##Final Task
-```{r dailySentiments}
-tslaSentiments = tsla_news %>%
-  group_by(Date) %>%
-  summarise(tslaSentimentsSum = sum(Sentiment, na.rm = TRUE),
-                                mean(Sentiment, na.rm = TRUE))
-
-googSentiments = goog_news %>%
-  group_by(Date) %>%
-  summarise(googSentimentsSum = sum(Sentiment, na.rm = TRUE), 
-                                mean(Sentiment, na.rm = TRUE))
-```
-
-### 5 - PCA Regression
-
-
-```{r highCorr}
-#Recall highly correlated variables before making changes
-
-#TSLA
-highCorrTsla = tslaSelected %>%
-  cor %>%
-  caret::findCorrelation(.8, names = TRUE)
-highCorrTsla
-corrplot::corrplot(cor(tslaSelected), order="hclust")
-#GOOG
-highCorrGoog = googSelected %>%
-  cor %>%
-  caret::findCorrelation(.8, names = TRUE)
-highCorrGoog
-corrplot::corrplot(cor(googSelected), order="hclust")
-```
-
-###### Calculation
-* Resistance Level 3 = Previous Day High + 2(Pivot – Previous Day Low)
-* Resistance Level 2 = Pivot + (Resistance Level 1 – Support Level 1)
-* Resistance Level 1 = (Pivot x 2) – Previous Day Low
-* Pivot = Previous Day (High + Low + Close) / 3
-* Support Level 1 = (Pivot x 2) – Previous Day High
-* Support Level 2 = Pivot – (Resistance Level 1 – Support Level 1)
-* Support Level 3 = Previous Day Low – 2(Previous Day High – Pivot)
-
 ```{r newVar}
 ###TSLA
 tslaTemp = tslaSelected %>% 
@@ -636,16 +593,6 @@ googTemp = googSelected %>%
          )
 ```
 
-On Balance Volume is calculated by adding the day's volume to a cumulative total when the security's price closes up, and subtracting the day's volume when the security's price closes down.
-
-If today's close is greater than yesterday's close then:
-OBV = Yesterday’s OBV + Today’s Volume
-
-If today’s close is less than yesterday’s close then:
-OBV = Yesterday’s OBV – Today’s Volume
-
-If today’s close is equal to yesterday’s close then:
-OBV = Yesterday’s OBV
 
 ```{r OnBalanceVolume}
 ###TSLA
@@ -659,18 +606,7 @@ googAddOBV = googTemp %>%
 
 ```
 
-#####Chaikin money flow
-Calculation:
-CMF            = n-day Sum of [(((C - L) - (H - C)) / (H - L)) x Vol] / n-day Sum of Vol
-cmfNumerator   = n-day Sum of [(((C - L) - (H - C)) / (H - L)) x Vol]
-cmfDenominator = n-day Sum of Vol
 
-Where:
-n = number of periods, typically 21
-H = high
-L = low
-C = close
-Vol = volume
 
 ```{r chaikinMoneyFlow}
 #TSLA
@@ -683,7 +619,6 @@ googAddCMF = googAddOBV %>%
   mutate(cmf = TTR::CMF(googAddOBV[,c("PX_HIGH","PX_LOW","PX_LAST")], PX_VOLUME, n = daysCMF))
 ```
 
-#####Exponential Moving Average (EMA)
 
 
 ```{r exponentialMovingAverage}
@@ -711,7 +646,7 @@ googAddRSI = googAddEMA %>%
   mutate(rsi = TTR::RSI(PX_LAST, n=daysRSI, maType="WMA", wts=PX_VOLUME))
 ```
 
-SMA calculates the arithmetic mean of the series over the past n observations.
+
 ```{r simpleMovingAverage(SMA)}
 ###Tsla
 daysSMA = 10
@@ -742,13 +677,9 @@ googHLC  = googSelected %>% dplyr::select(PX_HIGH, PX_LOW, PX_LAST)
 googAddK = googAddSMA %>%
  dplyr::mutate(smi_K = (stoch(googHLC, nFastK = daysK, nFastD = daysD, nSlowD = 3, bounded = TRUE,smooth = 1))[,1]) %>% #calculate fastK%
  dplyr::mutate(smi_D = (stoch(googHLC, nFastK = daysK, nFastD = daysD, nSlowD = 3, bounded = TRUE,smooth = 1))[,2])  #calculate fastD%
-
-#bounded:Logical, should current period’s values be used in the calculation? Set it as TRUE here. We will align Y's with past X's in Section xxx.
-#Reference:https://library.tradingtechnologies.com/trade/chrt-ti-stochastic-momentum-index.html
-
 ```
 
-Moving Average Convergence Divergence
+
 ```{r MACD}
 ###TSLA
 daysMACDslow   = 26 #default nSlow
@@ -786,7 +717,7 @@ googAddR = googAddMACD %>%
 
 ```
 
-TheWilliams Accumulation / Distribution (AD) line is a measure of market momentum. Developed by Larry Williams. The Williams AD line differs from OBV and chaikinAD in that it doesn’t take volume into account.
+
 ```{r Accumulation/Distribution}
 ###TSLA
 tslaAddAD = tslaAddR %>%
@@ -797,7 +728,7 @@ googAddAD = googAddR %>%
 
 ```
 
-The Commodity Channel Index (CCI) attempts to identify starting and ending trends.CCI relates the current price and the average of price over n periods. The CCI usually falls in a channel of -100 to 100. A basic CCI trading system is: Buy (sell) if CCI rises above 100 (falls below -100) and sell (buy) when it falls below 100 (rises above -100).
+
 
 ```{r CommodityChannelIndex(CCI)}
 ###TSLA
@@ -963,13 +894,21 @@ addDiffVarF = function(dataForModification,nColumn) {
 
 #tslaAddDiff =  addDiffVarF(tslaSelected,ncol(tslaSelected))
 ``` 
-A few added indicators represent moving average of price or volume in a past designated period. Hence, we probably don't need to include lagged values. 
-Probably delete above codes later ##################
-
-Up till now, we added xx stock indicators:
-`r names(beforeAfterVar)`
 
 
+###Final Task
+
+```{r dailySentiments}
+tslaSentiments = tsla_news %>%
+  group_by(Date) %>%
+  summarise(tslaSentimentsSum = sum(Sentiment, na.rm = TRUE),
+                                mean(Sentiment, na.rm = TRUE))
+
+googSentiments = goog_news %>%
+  group_by(Date) %>%
+  summarise(googSentimentsSum = sum(Sentiment, na.rm = TRUE), 
+                                mean(Sentiment, na.rm = TRUE))
+```
 
 ```{r assignYandX}
 tslaAddVolTrendRemoveNA = tslaAddVolTrend %>%
@@ -977,6 +916,7 @@ tslaAddVolTrendRemoveNA = tslaAddVolTrend %>%
 tslaFullStandardized =  tslaAddVolTrendRemoveNA %>%
   caret::preProcess(method = c("center","scale")) %>%
   predict(newdata =tslaAddVolTrendRemoveNA)
+
 
 ###TSLA
 tslaY  = tslaFullStandardized %>%
@@ -992,10 +932,11 @@ tslaX    = tslaFullStandardized %>%
 names(tslaY)[2] = "diffHighLowTomorrow" #Y1
 names(tslaY)[3] = "stockReturnTomorrow" #Y2
 names(tslaY)[4] = "stockReturnTomorrowDummy" #Y3
-
+nrow(tslaX)
+nrow(tslaY)
 #####Dummy Variables
 ###TSLA
-XtslaAddLevels = tslaFullStandardized %>%
+XtslaAddLevels = tslaX %>%
   mutate(aboveR1 = factor(ifelse(PX_HIGH > R1, "Yes", "No"))) %>%
   mutate(aboveR2 = factor(ifelse(PX_HIGH > R2, "Yes", "No"))) %>%
   mutate(aboveR3 = factor(ifelse(PX_HIGH > R3, "Yes", "No"))) %>%
@@ -1005,7 +946,7 @@ XtslaAddLevels = tslaFullStandardized %>%
   select(aboveR1, aboveR2, aboveR3, belowS1, belowS2, belowS3)            
 XtslaDummyModel = caret::dummyVars(~ ., data = XtslaAddLevels, fullRank = TRUE)
 
-
+nrow(XtslaAddLevels)
 
 YtslaAddLevels = as_tibble(factor(ifelse(tslaY$stockReturnTomorrow > 0, "Increased", "Decreased"))) 
 YtslaDummyModel = caret::dummyVars(~ ., data = YtslaAddLevels, fullRank = TRUE)
@@ -1017,12 +958,14 @@ XtslaDummy = as_tibble(predict(XtslaDummyModel, XtslaAddLevels))
 YtslaDummy = as_tibble(predict(YtslaDummyModel, YtslaAddLevels))
 names(YtslaDummy)[1] = "stockReturnTomorrowDummy" #Y2
 
+nrow(XtslaDummy)
+nrow(YtslaDummy)
 
-tslaFullWithDummy = tslaFullStandardized %>% 
-  mutate(XtslaDummy) %>% 
-  dplyr::select(-R1,-S1,-R2,-S2,-R3,-S3) %>% 
-  #Drop PP, R1, R2, R3, S1, S2, S3 
-  mutate(YtslaDummy) 
+#tslaFullWithDummy = tslaFullStandardized %>% 
+#  mutate(XtslaDummy) %>% 
+#  dplyr::select(-R1,-S1,-R2,-S2,-R3,-S3) %>% 
+#  #Drop PP, R1, R2, R3, S1, S2, S3 
+#  mutate(YtslaDummy) 
 
 XtslaWithDummy = tslaX %>%
   mutate(XtslaDummy) %>% 
@@ -1033,16 +976,21 @@ XtslaWithoutDummy = tslaX %>%
 
 YtslaWithDummy = tslaY %>% mutate(YtslaDummy) 
 
+#X:20190909 - 20200828
+#Y:20190910 - 20200831
+XtslaWithDummy_subset = XtslaWithDummy[2164:nrow(XtslaWithDummy),] 
+YtslaWithDummy_subset = YtslaWithDummy[2164:nrow(YtslaWithDummy),]
+YtslaWithDummy_subsetWithoutDate = YtslaWithDummy_subset[,-1]
+
+tslaFull = cbind(YtslaWithDummy_subsetWithoutDate,XtslaWithDummy_subset) 
+tslaFullWithSentiments = merge(tslaFull,tslaSentiments)
+
+XtslaWithSentiments = tslaFullWithSentiments %>%
+  select(-c(Date,diffHighLowTomorrow,stockReturnTomorrow,stockReturnTomorrowDummy))
+YtslaWithSentiments = tslaFullWithSentiments %>%
+  select(c(Date,diffHighLowTomorrow,stockReturnTomorrow,stockReturnTomorrowDummy))
 
 
-
-
-
-
-
-#Correlation between stock data of today and difference between highest and lowest stock prices on tomorrow is much higher than correlation between stock data of today and daily stock return on tomorrow. Thus, it's suggested to use "diffHighLowTomorrow " as the supervisor in model fitting.
-
-#summary(tslaY$diffHighLowTomorrow)
 
 ##GOOG
 googY  = googAddVolTrend %>%
@@ -1063,63 +1011,6 @@ names(googY)[2] = "stockReturnTomorrow" #Y2
 names(googY)[3] = "stockReturnTomorrowDummy" #Y3
 
 googFull = dplyr::as_tibble(cbind(googY,googX))
-
-```
-
-
-
-
-##### 5.2 Linear Model
-```{r dummyVarForLogisticRegression}
-#hist(tslaReg$stockReturn, breaks=20, freq=FALSE,main = paste("Density Plot - ",names(tslaReg$stockReturn)),xlab = " ") # stock return is normally distributed.
-
-###TSLA
-XtslaAddLevels = tslaX %>%
-  mutate(aboveR1 = factor(ifelse(PX_HIGH > R1, "Yes", "No"))) %>%
-  mutate(aboveR2 = factor(ifelse(PX_HIGH > R2, "Yes", "No"))) %>%
-  mutate(aboveR3 = factor(ifelse(PX_HIGH > R3, "Yes", "No"))) %>%
-  mutate(belowS1 = factor(ifelse(PX_LOW  < S1, "Yes", "No"))) %>%
-  mutate(belowS2 = factor(ifelse(PX_LOW  < S2, "Yes", "No"))) %>%
-  mutate(belowS3 = factor(ifelse(PX_LOW  < S3, "Yes", "No"))) %>%
-  select(aboveR1, aboveR2, aboveR3, belowS1, belowS2, belowS3)            
-XtslaDummyModel = caret::dummyVars(~ ., data = XtslaAddLevels, fullRank = TRUE)
-
-
-
-YtslaAddLevels = as_tibble(factor(ifelse(tslaY$stockReturnTomorrow > 0, "Increased", "Decreased"))) 
-YtslaDummyModel = caret::dummyVars(~ ., data = YtslaAddLevels, fullRank = TRUE)
-
-
-
-XtslaDummy = as_tibble(predict(XtslaDummyModel, XtslaAddLevels))
-YtslaDummy = as_tibble(predict(YtslaDummyModel, YtslaAddLevels))
-
-
-
-names(YtslaDummy)[1] = "stockReturnTomorrowDummy" #Y2
-
-
-tslaFull = 
-
-tslaFullWithDummy = tslaFull %>% 
-  mutate(XtslaDummy) %>% 
-  dplyr::select(-R1,-S1,-R2,-S2,-R3,-S3) %>% 
-  #Drop PP, R1, R2, R3, S1, S2, S3 
-  mutate(YtslaDummy) 
-
-XtslaWithDummy = tslaX %>%
-  mutate(XtslaDummy) %>% 
-  dplyr::select(-R1,-S1,-R2,-S2,-R3,-S3)
-
-XtslaWithoutDummy = tslaX %>%
-  dplyr::select(-R1,-S1,-R2,-S2,-R3,-S3)
-
-YtslaWithDummy = tslaY %>% mutate(YtslaDummy) 
-
-
-
-
-
 ###GOOG
 XgoogAddLevels = googX %>%
   mutate(aboveR1 = factor(ifelse(PX_HIGH > R1, "Yes", "No"))) %>%
@@ -1161,896 +1052,10 @@ XgoogWithoutDummy = googX %>%
   dplyr::select(-R1,-S1,-R2,-S2,-R3,-S3)
 
 YgoogWithDummy = googY %>% mutate(YgoogDummy) 
-
-```
-
-```{r reviewHighCorr}
-###TSLA
-hclustPlotF(tslaFullWithDummy)
-highCorrTsla = highCorrF(XtslaWithDummy,0.8)
-highCorrTsla
-
-XtslaWithDummyRemoveCorr = XtslaWithDummy %>% select(-highCorrTsla)
-hclustPlotF(XtslaWithDummyRemoveCorr)
-
-###GOOG
-hclustPlotF(googFullWithDummy)
-highCorrGoog = highCorrF(XgoogWithDummy,0.8)
-highCorrGoog
-
-XgoogWithDummyRemoveCorr = XgoogWithDummy %>% select(-highCorrGoog)
-hclustPlotF(XgoogWithDummyRemoveCorr)
-
-```
-
-```{r linearRegression}
-###TSLA
-#First, remove highly correlated features and correct skewness
-highCorrTsla = highCorrF(tslaX,0.8)
-tslaXRemoveCorr = tslaX %>% select(-highCorrTsla)
-
-tslaXyeoJ = tslaXRemoveCorr %>%
-  caret::preProcess(method = "YeoJohnson") %>%
-  predict(newdata = tslaXRemoveCorr)
-
-#hist(tslaY$diffHighLowTomorrow)
-#hist(tslaY$stockReturnTomorrow)
-
-tslaYyeoJ = tslaY %>%
-  caret::preProcess(method = "YeoJohnson") %>%
-  predict(newdata = tslaY)
-#hist(tslaYyeoJ$diffHighLowTomorrow)
-#hist(tslaYyeoJ$stockReturnTomorrow)
-
-Ktsla = 10
-cvIndexTsla = caret::createFolds(tslaYyeoJ$diffHighLowTomorrow, k = Ktsla, returnTrain = TRUE)
-trControl = trainControl(method = "cv", index = cvIndexTsla)
-
-#names(tslaXyeoJ)
-XtslaLinearReg = tslaXyeoJ %>%
-  caret::preProcess(method = c("center","scale")) %>%
-  predict(tslaXyeoJ) %>%
-  cbind(.,XtslaDummy)
-
-#names(XtslaDummy)
-
-YtslaLinearReg = tslaYyeoJ %>%
-  caret::preProcess(method = c("center","scale")) %>%
-  predict(newdata = tslaYyeoJ) %>%
-  cbind(.,YtslaDummy)
-
-#Linear regression when Supervisor = diffHighLowTomorrow
-lmOutTslaDiffHighLow = train(x = XtslaLinearReg, y = YtslaLinearReg$diffHighLowTomorrow, method = "lm", trControl = trControl)
-
-summary(lmOutTslaDiffHighLow)
-
-#Linear regression when Supervisor = StockReturn
-lmOutTslaStockReturn = train(x = XtslaLinearReg, y = YtslaLinearReg$stockReturnTomorrow, method = "lm", trControl = trControl)
-
-summary(lmOutTslaStockReturn)
-
-
-
-
-
-###GOOG
-#First, correct skewness
-highCorrGoog = highCorrF(googX,0.8)
-googXRemoveCorr = googX %>% select(-highCorrGoog)
-
-googXyeoJ = googXRemoveCorr %>%
-  caret::preProcess(method = "YeoJohnson") %>%
-  predict(newdata = googXRemoveCorr)
-
-googYyeoJ = googY %>%
-  caret::preProcess(method = "YeoJohnson") %>%
-  predict(newdata = googY)
-
-
-Kgoog = 10
-cvIndexGoog = caret::createFolds(googYyeoJ$diffHighLowTomorrow, k = Kgoog, returnTrain = TRUE)
-trControl = trainControl(method = "cv", index = cvIndexGoog)
-
-XgoogLinearReg = googXyeoJ %>%
-  caret::preProcess(method = c("center","scale")) %>%
-  predict(googXyeoJ) %>%
-  cbind(.,XgoogDummy) 
-
-YgoogLinearReg = googYyeoJ %>%
-  caret::preProcess(method = c("center","scale")) %>%
-  predict(newdata = googYyeoJ) %>%
-  cbind(.,YgoogDummy) 
-
-#Linear regression when Supervisor = diffHighLowTomorrow
-lmOutGoogDiffHighLow = train(x = XgoogLinearReg, y = YgoogLinearReg$diffHighLowTomorrow, method = "lm", trControl = trControl)
-
-summary(lmOutGoogDiffHighLow)
-
-#Linear regression when Supervisor = StockReturn
-lmOutGoogStockReturn = train(x = XgoogLinearReg, y = YgoogLinearReg$stockReturnTomorrow, method = "lm", trControl = trControl)
-
-summary(lmOutGoogStockReturn)
-```
-
-```{r linearRegPenalized}
-###TSLA
-#ridge regression
-trControl = trainControl(method = "cv", index = cvIndexTsla)
-ridgeOutTsla = train(x = XtslaLinearReg, y = YtslaLinearReg$diffHighLowTomorrow, method = "ridge", tuneLength = 10,trControl = trControl)
-
-ridgeOutTsla
-
-#lasso regression
-lassoOutTsla = train(x = XtslaLinearReg, y = YtslaLinearReg$diffHighLowTomorrow, method = "lasso", tuneLength = 10,trControl = trControl)
-
-lassoOutTsla
-
-#elastic net
-gridLambdaAlpha = expand.grid(lambda = seq(1e-6, 0.05, length = 15), alpha = c(0,0.25,.5,.75,1))
-
-enetOutTsla = train(x = XtslaLinearReg, y = YtslaLinearReg$diffHighLowTomorrow,
-                method = "glmnet", tuneGrid = gridLambdaAlpha, trControl = trControl)
-
-enetOutTsla
-
-plot(enetOutTsla, xlab = "Lambda (Elastic Net Penalty)", ylab = "RMSE (K-fold CV)" )
-
-#Results of penalized linear model
-#names(enetOutTsla$finalModel)
-
-alphaHatTsla  = enetOutTsla$finalModel$tuneValue$alpha
-lambdaHatTsla = enetOutTsla$finalModel$tuneValue$lambda
-
-
-
-
-###GOOG
-#ridge regression
-trControl = trainControl(method = "cv", index = cvIndexGoog)
-ridgeOutGoog = train(x = XgoogLinearReg, y = YgoogLinearReg$diffHighLowTomorrow, method = "ridge", tuneLength = 10,trControl = trControl)
-
-ridgeOutGoog
-
-#lasso regression
-lassoOutGoog = train(x = XgoogLinearReg, y = YgoogLinearReg$diffHighLowTomorrow, method = "lasso", tuneLength = 10,trControl = trControl)
-
-lassoOutGoog
-
-#elastic net
-gridLambdaAlpha = expand.grid(lambda = seq(1e-6, 0.05, length = 15), alpha = c(0,0.25,.5,.75,1))
-
-enetOutGoog = train(x = XgoogLinearReg, y = YgoogLinearReg$diffHighLowTomorrow,
-                method = "glmnet", tuneGrid = gridLambdaAlpha, trControl = trControl)
-
-enetOutGoog
-
-plot(enetOutGoog, xlab = "Lambda (Elastic Net Penalty)", ylab = "RMSE (K-fold CV)" )
-
-#Results of penalized linear model
-#names(enetOutTsla$finalModel)
-
-alphaHatGoog  = enetOutGoog$finalModel$tuneValue$alpha
-lambdaHatGoog = enetOutGoog$finalModel$tuneValue$lambda
-
-
-```
-
->Tesla (TSLA)
-
-The CV - minimizing values are alpha = `r alphaHatTsla` and lambda = `r lambdaHatTsla`.
-Next, refit the model with this alpha by calling "glmnet" directly and select the lambdaHat that minimized CV. 
-
-Use results from  Elastic Net Regression to find coefficients Beta's.
-
-```{r betaPenalizedRegression}
-###TSLA
-glmnetOutTsla = glmnet::glmnet(x = as.matrix(XtslaLinearReg), y = YtslaLinearReg$diffHighLowTomorrow, alpha = alphaHatTsla, standardize = FALSE)
-(betaHatTsla = coef(glmnetOutTsla, s = lambdaHatTsla))
-
-###GOOG
-glmnetOutGoog = glmnet::glmnet(x = as.matrix(XgoogLinearReg), y = YgoogLinearReg$diffHighLowTomorrow, alpha = alphaHatGoog, standardize = FALSE)
-(betaHatGoog = coef(glmnetOutTsla, s = lambdaHatTsla))
-
 ```
 
 
-
-##### 5.3 PCA regression
-
-```{r calculatePCA}
-#use data crearted in {r assignYandX}
-
-###TSLA
-#It's suggested to use only quantitative variables in PCA regression
-#Transform the selected data
-tslaTrans = caret::preProcess(tslaX, method = c("BoxCox","center","scale","pca"))
-tslaTrans = caret::preProcess(as.data.frame(tslaX), method = c("BoxCox","center","scale","pca"))
-
-#Apply the transformations("BoxCox","center","scale","pca")
-tslaPCA = stats::predict(tslaTrans,as.data.frame(tslaX)) #Outputs are PCA components
-#utils::head(tslaPCA)
-
-#Summary of PCA results
-tslaTrans_     = caret::preProcess(as.data.frame(tslaX), method = c("BoxCox","center","scale"))
-propVarTslaPCA = as.data.frame(tslaX) %>%
-                 stats::predict(tslaTrans_,.) %>%
-                 stats::prcomp() %>%
-                 summary()
-#propVarTslaPCA #proportion of variance explained by each PCs
-
-
-#Transform the selected data
-googTrans = caret::preProcess(as.data.frame(googX), method = c("BoxCox","center","scale","pca"))
-
-#Apply the transformations("BoxCox","center","scale","pca")
-googPCA = stats::predict(googTrans,as.data.frame(googX)) #Outputs are PCA components
-#utils::head(googPCA)
-
-#Summary of PCA results
-googTrans_    = caret::preProcess(as.data.frame(googX), method = c("BoxCox","center","scale"))
-propVarGoogPCA = as.data.frame(googX) %>%
-                 stats::predict(googTrans_,.) %>%
-                 stats::prcomp() %>%
-                 summary()
-#propVarGoogPCA #proportion of variance explained by each PCs
-
-```
-
-```{r dataSplitPCA}
-#use data crearted in {r assignYandX}
-set.seed(2022)
-###TSLA
-trainIndexHL_Tsla = caret::createDataPartition(tslaY$diffHighLowTomorrow, p = 0.25, list = FALSE)
-trainIndexSR_Tsla = caret::createDataPartition(tslaY$stockReturnTomorrow, p = 0.25, list = FALSE)
-
-YtslaTrain_HL      = tslaY$diffHighLowTomorrow[trainIndexHL_Tsla]
-YtslaTrain_SR      = tslaY$stockReturnTomorrow [trainIndexSR_Tsla]
-YtslaTrain_SRDummy = tslaY$stockReturnTomorrowDummy[trainIndexSR_Tsla]
-
-YtslaTest_HL       = tslaY$diffHighLowTomorrow[-trainIndexHL_Tsla]
-YtslaTest_SR       = tslaY$stockReturnTomorrow [-trainIndexSR_Tsla]
-YtslaTest_SRDummy  = tslaY$stockReturnTomorrowDummy[-trainIndexSR_Tsla]
-
-
-XtslaTrain_HL = tslaPCA[trainIndexHL_Tsla,] 
-XtslaTrain_SR = tslaPCA[trainIndexSR_Tsla,] 
-
-XtslaTest_HL  = tslaPCA[-trainIndexHL_Tsla,]
-XtslaTest_SR  = tslaPCA[-trainIndexSR_Tsla,]
-
-
-###GOOG
-set.seed(2020)
-
-trainIndexHL_Goog = caret::createDataPartition(googY$diffHighLowTomorrow, p = 0.25, list = FALSE)
-trainIndexSR_Goog = caret::createDataPartition(googY$stockReturnTomorrow, p = 0.25, list = FALSE)
-
-YgoogTrain_HL      = googY$diffHighLowTomorrow[trainIndexHL_Goog]
-YgoogTrain_SR      = googY$stockReturnTomorrow[trainIndexSR_Goog]
-YgoogTrain_SRDummy = googY$stockReturnTomorrowDummy[trainIndexSR_Goog]
-
-YgoogTest_HL       = googY$diffHighLowTomorrow[-trainIndexHL_Goog]
-YgoogTest_SR       = googY$stockReturnTomorrow[-trainIndexSR_Goog]
-YgoogTest_SRDummy  = googY$stockReturnTomorrowDummy[-trainIndexSR_Goog]
-
-
-XgoogTrain_HL = googPCA[trainIndexHL_Goog,] 
-XgoogTrain_SR = googPCA[trainIndexSR_Goog,] 
-
-XgoogTest_HL  = googPCA[-trainIndexHL_Goog,]
-XgoogTest_SR  = googPCA[-trainIndexSR_Goog,]
-
-```
-
-
-```{r PCA Regression}
-###TSLA
-#YtslaTrain_HL      #Y1
-#YtslaTrain_SR      #Y2
-#YtslaTrain_SRDummy #Y3 #logistic regression
-#XtslaTrain_HL      #X1
-#XtslaTrain_SR      #X2
-#XtslaTrain_SR      #X3
-
-Ktsla = 10
-cvIndexTsla = caret::createFolds(YtslaTrain_HL, k = Ktsla, returnTrain = TRUE)
-trControl = trainControl(method = "cv", index = cvIndexTsla)
-lmOutTslaHL_PCA = train(x = XtslaTrain_HL, y = YtslaTrain_HL, 
-                        method = "lm", trControl = trControl)
-summary(lmOutTslaHL_PCA)
-YtslaHL_pred    = predict(lmOutTslaHL_PCA,XtslaTest_HL)
-residTslaHL     = YtslaHL_pred - YtslaTest_HL
-plot(YtslaTest_HL, residTslaHL, main = "Residuals vs predicted_diffHighLowTsla")
-
-Ktsla = 10
-cvIndexTsla = caret::createFolds(YtslaTrain_SR, k = Ktsla, returnTrain = TRUE)
-trControl = trainControl(method = "cv", index = cvIndexTsla)
-lmOutTslaSR_PCA = train(x = XtslaTrain_SR, y = YtslaTrain_SR, 
-                        method = "lm", trControl = trControl)
-summary(lmOutTslaSR_PCA)
-YtslaSR_pred    = predict(lmOutTslaSR_PCA,XtslaTest_SR)
-residTslaSR     = YtslaSR_pred - YtslaTest_SR
-plot(YtslaTest_SR, residTslaSR, main = "Residuals vs predicted_stockReturnTsla")
-
-###GOOG
-#YgoogTrain_HL      #Y1
-#YgoogTrain_SR      #Y2
-#YgoogTrain_SRDummy #Y3 
-#XgoogTrain_HL      #X1
-#XgoogTrain_SR      #X2
-#XgoogTrain_S       #X3
-
-Kgoog = 10
-cvIndexGoog     = caret::createFolds(YgoogTrain_HL, k = Kgoog, returnTrain = TRUE)
-trControl       = trainControl(method = "cv", index = cvIndexGoog)
-lmOutGoogHL_PCA = train(x = XgoogTrain_HL, y = YgoogTrain_HL, 
-                        method = "lm", trControl = trControl)
-summary(lmOutGoogHL_PCA)
-YgoogHL_pred    = predict(lmOutGoogHL_PCA,XgoogTest_HL)
-residGoogHL     = YgoogHL_pred - YgoogTest_HL
-plot(YgoogTest_HL, residGoogHL, main = "Residuals vs predicted_diffHighLowGoog")
-
-Kgoog = 10
-cvIndexGoog     = caret::createFolds(YgoogTrain_SR, k = Kgoog, returnTrain = TRUE)
-trControl       = trainControl(method = "cv", index = cvIndexGoog)
-lmOutGoogSR_PCA = train(x = XgoogTrain_SR, y = YgoogTrain_SR, 
-                        method = "lm", trControl = trControl)
-summary(lmOutGoogSR_PCA)
-YgoogSR_pred    = predict(lmOutGoogSR_PCA,XgoogTest_SR)
-residGoogSR     = YgoogSR_pred - YgoogTest_SR
-plot(YgoogTest_SR, residGoogSR, main = "Residuals vs predicted_stockReturnGoog")
-```
-
-
-##### 5.4 Nonlinear Model (MARS)
-
-```{r dataSplit}
-set.seed(2020)
-###TSLA
-YtslaNN    = YtslaLinearReg #highly correlated features are removed; standardized
-trainIndex = caret::createDataPartition(YtslaNN$diffHighLowTomorrow, p = 0.25, list = FALSE)
-
-YtslaTrain_DiffHighLow      = YtslaNN$diffHighLowTomorrow[trainIndex]
-YtslaTrain_StockReturn      = YtslaNN$stockReturnTomorrow[trainIndex]
-YtslaTrain_StockReturnDummy = YtslaNN$stockReturnTomorrowDummy[trainIndex]
-
-YtslaTest_DiffHighLow       = YtslaNN$diffHighLowTomorrow[-trainIndex]
-YtslaTest_StockReturn       = YtslaNN$stockReturnTomorrow[-trainIndex]
-YtslaTest_StockReturnDummy  = YtslaNN$stockReturnTomorrowDummy [-trainIndex]
-
-XtslaNN    = XtslaLinearReg #highly correlated features are removed; standardized
-
-XtslaTrain = XtslaNN[trainIndex,] 
-XtslaTest  = XtslaNN[-trainIndex,]
-
-###GOOG
-set.seed(2021)
-YgoogNN    = YgoogLinearReg #highly correlated features are removed; standardized
-trainIndex = caret::createDataPartition(YgoogNN$diffHighLowTomorrow, p = 0.25, list = FALSE)
-
-YgoogTrain_DiffHighLow      = YgoogNN$diffHighLowTomorrow[trainIndex]
-YgoogTrain_StockReturn      = YgoogNN$stockReturnTomorrow[trainIndex]
-YgoogTrain_StockReturnDummy = YgoogNN$stockReturnTomorrowDummy[trainIndex]
-
-YgoogTest_DiffHighLow       = YgoogNN$diffHighLowTomorrow[-trainIndex]
-YgoogTest_StockReturn       = YgoogNN$stockReturnTomorrow[-trainIndex]
-YgoogTest_StockReturnDummy  = YgoogNN$stockReturnTomorrowDummy [-trainIndex]
-
-XgoogNN    = XgoogLinearReg
-
-XgoogTrain = XgoogNN[trainIndex,] 
-XgoogTest  = XgoogNN[-trainIndex,]
-```
-
-
-```{r MARS}
-#Lecture 27
-###TSLA
-tuneGridTsla = expand.grid(degree = 1:3,
-                           nprune = c(10, 15, 20, 25, 30, 40, 50))
-
-set.seed(2020)
-number = 5 
-
-#cross validated model
-
-#-1-# Supervisor = StockReturn
-marsTuneTslaSR = caret::train(
-  x = XtslaTrain,
-  y = YtslaTrain_StockReturn,
-  method = "earth",
-  metric = "RMSE",
-  trControl = trainControl(method = "cv", number = number),
-  tuneGrid = tuneGridTsla
-)
-marsTuneTslaSR$bestTune
-min(marsTuneTslaSR$results$RMSE)
-max(marsTuneTslaSR$results$Rsquared)
-
-#library(digest) #Fixed error: Error: package ‘digest’ does not have a namespace
-ggplot2::ggplot(marsTuneTslaSR)
-
-#Multiple Linear Regression
-mlrCVTslaSR = train(
-  x = XtslaTrain,
-  y = YtslaTrain_StockReturn,
-  method = "lm",
-  metric = "RMSE",
-  trControl = trainControl(method = "cv", number = number)
-  #We've standardize our data. 
-)
-
-mlrCVTslaSR$results$RMSE
-mlrCVTslaSR$results$Rsquared
-
-#Elastic Net
-glmnetCVTslaSR = train(
-  x = XtslaTrain,
-  y = YtslaTrain_StockReturn,
-  method = "glmnet",
-  trControl = trainControl(method = "cv", number = number),
-  metric = "RMSE",
-  preProcess = "zv",
-  tuneLength = 20
-)
-
-min(glmnetCVTslaSR$results$RMSE)
-max(glmnetCVTslaSR$results$Rsquared, na.rm = TRUE)
-
-
-
-
-#-2-#Supervisor = diffHighLow
-marsTuneTslaHL = caret::train(
-  x = XtslaTrain,
-  y = YtslaTrain_DiffHighLow,
-  method = "earth",
-  metric = "RMSE",
-  trControl = trainControl(method = "cv", number = number),
-  tuneGrid = tuneGridTsla
-)
-
-marsTuneTslaHL$bestTune
-min(marsTuneTslaHL$results$RMSE)
-max(marsTuneTslaHL$results$Rsquared, na.rm = TRUE)
-
-ggplot2::ggplot(marsTuneTslaHL)
-
-mlrCVTslaHL = train(
-  x = XtslaTrain,
-  y = YtslaTrain_DiffHighLow,
-  method = "lm",
-  metric = "RMSE",
-  trControl = trainControl(method = "cv", number = number)
-  #We've standardize our data. 
-)
-
-mlrCVTslaHL$results$RMSE
-mlrCVTslaHL$results$Rsquared
-
-glmnetCVTslaHL = train(
-  x = XtslaTrain,
-  y = YtslaTrain_DiffHighLow,
-  method = "glmnet",
-  trControl = trainControl(method = "cv", number = number),
-  metric = "RMSE",
-  preProcess = "zv",
-  tuneLength = 20
-)
-
-min(glmnetCVTslaHL$results$RMSE)
-max(glmnetCVTslaHL$results$Rsquared, na.rm = TRUE)
-
-
-#Variable Importance
-##Supervisor = StockReturn
-marsVipTslaSR = vip::vip(marsTuneTslaSR, num_features = 47,  bar = NULL,geom = "point", value = "gcv")+ ggplot2::ggtitle("GCV - TSLA (47 Features)")
-plot(marsVipTslaSR)
-##Supervisor = diffHighLoW
-marsVipTslaHL = vip::vip(marsTuneTslaHL, num_features = 47,  bar = NULL,geom = "point", value = "gcv")+ ggplot2::ggtitle("GCV - TSLA (47 Features)")
-plot(marsVipTslaHL)
-
-
-
-
-
-###GOOG
-tuneGridGoog = expand.grid(degree = 1:3,
-                           nprune = c(10, 15, 20, 25, 30, 40, 50))
-
-set.seed(2021)
-number = 5 
-
-#cross validated model
-
-#-1-# Supervisor = StockReturn
-marsTuneGoogSR = caret::train(
-  x = XgoogTrain,
-  y = YgoogTrain_StockReturn,
-  method = "earth",
-  metric = "RMSE",
-  trControl = trainControl(method = "cv", number = number),
-  tuneGrid = tuneGridGoog
-)
-marsTuneGoogSR$bestTune
-min(marsTuneGoogSR$results$RMSE)
-max(marsTuneGoogSR$results$Rsquared)
-
-#library(digest) #Fixed error: Error: package ‘digest’ does not have a namespace
-ggplot2::ggplot(marsTuneGoogSR)
-
-#Multiple Linear Regression
-mlrCVGoogSR = train(
-  x = XgoogTrain,
-  y = YgoogTrain_StockReturn,
-  method = "lm",
-  metric = "RMSE",
-  trControl = trainControl(method = "cv", number = number)
-  #We've standardize our data. 
-)
-
-mlrCVGoogSR$results$RMSE
-mlrCVGoogSR$results$Rsquared
-
-#Elastic Net
-glmnetCVGoogSR = train(
-  x = XgoogTrain,
-  y = YgoogTrain_StockReturn,
-  method = "glmnet",
-  trControl = trainControl(method = "cv", number = number),
-  metric = "RMSE",
-  preProcess = "zv",
-  tuneLength = 20
-)
-
-min(glmnetCVGoogSR$results$RMSE)
-max(glmnetCVGoogSR$results$Rsquared, na.rm = TRUE)
-
-
-#-2-#Supervisor = diffHighLow
-marsTuneGoogHL = caret::train(
-  x = XgoogTrain,
-  y = YgoogTrain_DiffHighLow,
-  method = "earth",
-  metric = "RMSE",
-  trControl = trainControl(method = "cv", number = number),
-  tuneGrid = tuneGridGoog
-)
-
-marsTuneGoogHL$bestTune
-min(marsTuneGoogHL$results$RMSE)
-max(marsTuneGoogHL$results$Rsquared, na.rm = TRUE)
-
-ggplot2::ggplot(marsTuneGoogHL)
-
-mlrCVGoogHL = train(
-  x = XgoogTrain,
-  y = YgoogTrain_DiffHighLow,
-  method = "lm",
-  metric = "RMSE",
-  trControl = trainControl(method = "cv", number = number)
-  #We've standardize our data. 
-)
-
-mlrCVGoogHL$results$RMSE
-mlrCVGoogHL$results$Rsquared
-
-glmnetCVGoogHL = train(
-  x = XgoogTrain,
-  y = YgoogTrain_DiffHighLow,
-  method = "glmnet",
-  trControl = trainControl(method = "cv", number = number),
-  metric = "RMSE",
-  preProcess = "zv",
-  tuneLength = 20
-)
-
-min(glmnetCVGoogHL$results$RMSE)
-max(glmnetCVGoogHL$results$Rsquared, na.rm = TRUE)
-
-
-#Variable Importance
-##Supervisor = StockReturn
-marsVipGoogSR = vip::vip(marsTuneGoogSR, num_features = 41,  bar = NULL,geom = "point", value = "gcv")+ ggplot2::ggtitle("GCV - GOOG (47 Features)")
-plot(marsVipGoogSR)
-##Supervisor = diffHighLoW
-marsVipGoogHL = vip::vip(marsTuneGoogHL, num_features = 41,  bar = NULL,geom = "point", value = "gcv")+ ggplot2::ggtitle("GCV - GOOG (47 Features)")
-plot(marsVipGoogHL)
-```
-
-
-``` {r summary(MARS vs MLR vs ElasticNet}
-#Overall Comparisons of results from previous section
-
-###TSLA
-namesTslaRMSE = c("RMSE_MARS_tslaStockReturn",
-              "RMSE_MLR_tslaStockReturn",
-              "RMSE_GLMNET_tslaStockReturn",
-              "RMSE_MARS_tslaDiffHighLow",
-              "RMSE_MLR_tslaDiffHighLow",
-              "RMSE_GLMNET_tslaDiffHighLow"
-              )
-
-summaryTslaRMSE = c(min(marsTuneTslaSR$results$RMSE),
-                mlrCVTslaSR$results$RMSE,
-                min(glmnetCVTslaSR$results$RMSE),
-                min(marsTuneTslaHL$results$RMSE),
-                mlrCVTslaHL$results$RMSE,
-                min(glmnetCVTslaHL$results$RMSE)
-                )
-
-sumTslaRMSE = cbind(namesTslaRMSE,round(summaryTslaRMSE,digits = 5))
-
-
-knitr::kable(
- sumTslaRMSE,
- col.names = c("Metric","Values"),
- caption   = "Table of RMSE, Tsla ",
- align     = "lccrr"
-)
-
-
-namesTslaRsquared = c("Rsquared_MARS_tslaStockReturn",
-              "Rsquared_MLR_tslaStockReturn",
-              "Rsquared_GLMNET_tslaStockReturn",
-              "Rsquared_MARS_tslaDiffHighLow",
-              "Rsquared_MLR_tslaDiffHighLow",
-              "Rsquared_GLMNET_tslaDiffHighLow"
-              )
-
-summaryTslaRsquared = c(max(marsTuneTslaSR$results$Rsquared),
-                mlrCVTslaSR$results$Rsquared,
-                max(glmnetCVTslaSR$results$Rsquared, na.rm = TRUE),
-                max(marsTuneTslaHL$results$Rsquared),
-                mlrCVTslaHL$results$Rsquared,
-                max(glmnetCVTslaHL$results$Rsquared, na.rm = TRUE))
-
-
-sumTslaRsquared = cbind(namesTslaRsquared, round(summaryTslaRsquared,digits = 5))
-
-knitr::kable(
- sumTslaRsquared,
- col.names = c("Metric","Values"),
- caption   = "Table of Rsquared, Tsla ",
- align     = "lccrr"
-)
-
-
-
-
-###GOOG
-namesGoogRMSE = c("RMSE_MARS_googStockReturn",
-              "RMSE_MLR_googStockReturn",
-              "RMSE_GLMNET_googStockReturn",
-              "RMSE_MARS_googDiffHighLow",
-              "RMSE_MLR_googDiffHighLow",
-              "RMSE_GLMNET_googDiffHighLow"
-              )
-
-summaryGoogRMSE = c(min(marsTuneGoogSR$results$RMSE),
-                  mlrCVGoogSR$results$RMSE,
-                  min(glmnetCVGoogSR$results$RMSE),
-                  min(marsTuneGoogHL$results$RMSE),
-                  mlrCVGoogHL$results$RMSE,
-                  min(glmnetCVGoogHL$results$RMSE)
-                  )
-
-sumGoogRMSE = cbind(namesGoogRMSE,round(summaryGoogRMSE,digits = 5))
-
-
-knitr::kable(
- sumGoogRMSE,
- col.names = c("Metric","Values"),
- caption   = "Table of RMSE, GOOG ",
- align     = "lccrr"
-)
-
-
-namesGoogRsquared = c("Rsquared_MARS_googStockReturn",
-              "Rsquared_MLR_googStockReturn",
-              "Rsquared_GLMNET_googStockReturn",
-              "Rsquared_MARS_googDiffHighLow",
-              "Rsquared_MLR_googDiffHighLow",
-              "Rsquared_GLMNET_googDiffHighLow"
-              )
-
-summaryGoogRsquared = c(max(marsTuneGoogSR$results$Rsquared),
-                mlrCVGoogSR$results$Rsquared,
-                max(glmnetCVGoogSR$results$Rsquared, na.rm = TRUE),
-                max(marsTuneGoogHL$results$Rsquared),
-                mlrCVGoogHL$results$Rsquared,
-                max(glmnetCVGoogHL$results$Rsquared, na.rm = TRUE))
-
-
-sumGoogRsquared = cbind(namesGoogRsquared, round(summaryGoogRsquared,digits = 5))
-
-knitr::kable(
- sumGoogRsquared,
- col.names = c("Metric","Values"),
- caption   = "Table of Rsquared, GOOG ",
- align     = "lccrr"
-)
-
-```
-
-```{r createCSVForNN_Python}
-#Supervisors and features are all standardized except the dummy variables. 
-tslaY1 = YtslaNN$stockReturnTomorrow 
-tslaY2 = YtslaNN$stockReturnTomorrowDummy
-tslaY3 = YtslaNN$diffHighLowTomorrow
-
-#Supervisors
-write.csv(tslaY1,"D:/Mia/STAT/656/tslaSR_Y1.csv", 
-          row.names = FALSE)
-write.csv(tslaY2,"D:/Mia/STAT/656/tslaSRdummy_Y2.csv", 
-          row.names = FALSE)
-write.csv(tslaY3,"D:/Mia/STAT/656/tslaHL_Y3.csv", 
-          row.names = FALSE)
-#Feature Matrix
-write.csv(XtslaNNFull,"D:/Mia/STAT/656/XtslaNNFull.csv", 
-          row.names = FALSE)
-
-#Feature Matrix without highly correlated features
-write.csv(XtslaNNFullRemoveCorr,"D:/Mia/STAT/656/XtslaNNFullRemoveCorr.csv",
-          row.names = FALSE)
-
-hclustPlotF(XtslaNNScaled)
-```
-
-
-```{r modelPerformance}
-#Calculate test errors
-
-#confusion matrix
-
-```
-
-##### 5.5 Nonlinear Model (KNN)
-
-```{r knnRegression_PCA}
-###TSLA
-tuneGridTslaKNNReg = data.frame('kmax' = 10,
-                             'distance' = 2,
-                             'kernel' = 'optimal')
-knnRegOutTsla  = train(x = XtslaTrain_HL[,1:5], y = YtslaTrain_HL,
-                       method = "kknn", tuneGrid = tuneGridTslaKNNReg,
-                       trControl = trainControl(method = 'cv', number = 10))
-summary(knnRegOutTsla)
-
-YtslaKNNReg_pred = predict(knnRegOutTsla, XtslaTest_HL[,1:5], 
-                           k = knnRegOutTsla$finalModel$best.parameters$k)
-resid_YtslaKNNReg = YtslaKNNReg_pred - YtslaTest_HL
-plot(YtslaTest_HL,resid_YtslaKNNReg)
-###GOOG
-tuneGridGoogKNNReg = data.frame('kmax' = 10,
-                             'distance' = 2,
-                             'kernel' = 'optimal')
-knnRegOutGoog  = train(x = XgoogTrain_HL[,1:5], y = YgoogTrain_HL,
-                       method = "kknn", tuneGrid = tuneGridGoogKNNReg,
-                       trControl = trainControl(method = 'cv', number = 10))
-summary(knnRegOutGoog)
-
-YgoogKNNReg_pred = predict(knnRegOutGoog, XgoogTest_HL[,1:5], 
-                           k = knnRegOutGoog$finalModel$best.parameters$k)
-resid_YgoogKNNReg = YgoogKNNReg_pred - YgoogTest_HL
-plot(YgoogTest_HL,resid_YgoogKNNReg)
-
-```
-```{r knnClassification_PCA}
-
-###TSLA
-
-#Supervisor = stockReturnTomorrowDummuy
-tuneGridTslaKNN = expand.grid(k = c(1,2,10,50,100,180))
-knnOutTsla = train(x = XtslaTrain_SR[,1:5], y = as.factor(YtslaTrain_SRDummy),
-                   method = "knn",
-                   tuneGrid = tuneGridTslaKNN,
-                   trControl = trainControl(method = 'cv', number = 10))
-
-knnOutTsla$finalModel$k
-summary(knnOutTsla)
-
-plot(knnOutTsla$results$Accuracy, xlab = "#Neighbors")
-
-YtslaDummyKNN_pred = predict(knnOutTsla, XtslaTest_SR, k = 1)
-correctYtslaDummyKNN = ifelse(YtslaDummyKNN_pred == YtslaTest_SR, 1, 0)
-
-
-###GOOG
-#Supervisor = stockReturnTomorrowDummuy
-tuneGridGoogKNN = expand.grid(k = c(1,2,10,50,100,180))
-knnOutGoog = train(x = XgoogTrain_SR[,1:5], y = as.factor(YgoogTrain_SRDummy),
-                   method = "knn",
-                   tuneGrid = tuneGridGoogKNN,
-                   trControl = trainControl(method = 'cv', number = 10))
-
-knnOutGoog$finalModel$k
-summary(knnOutGoog)
-plot(knnOutGoog$results$Accuracy, xlab = "#Neighbors")
-
-```
-
-
-```{r knnRegression_VIP}
-#use {mars} data splits
-###TSLA
-xTslaTrainVIP = XtslaTrain %>%
-  select(c(afterHourDiffPriceRatio,smaVolume,obv,PROF_MARGIN,increaseTrend))
-xTslaTestVIP  = XtslaTest  %>%
-  select(c(afterHourDiffPriceRatio,smaVolume,obv,PROF_MARGIN,increaseTrend))
-
-tuneGridTslaKNNReg = data.frame('kmax' = 10,
-                             'distance' = 2,
-                             'kernel' = 'optimal')
-knnRegOutTslaVIP  = train(x = xTslaTrainVIP, y = YtslaTrain_DiffHighLow,
-                       method = "kknn", tuneGrid = tuneGridTslaKNNReg,
-                       trControl = trainControl(method = 'cv', number = 10))
-summary(knnRegOutTslaVIP)
-
-YtslaKNNRegVIP_pred = predict(knnRegOutTslaVIP, xTslaTestVIP, 
-                           k = knnRegOutTslaVIP$finalModel$best.parameters$k)
-resid_YtslaKNNRegVIP = YtslaKNNRegVIP_pred - YtslaTest_DiffHighLow
-plot(YtslaTest_DiffHighLow,resid_YtslaKNNRegVIP)
-###GOOG
-```
-
-```{r knnClassification_VIP}
-
-```
-
-
-
-##### 6 - Neural Networks
-```{r scatterPlots}
-
-remove.packages("keras")
-remove.packages("tensorflow")
-
-install.packages("reticulate")
-library(reticulate)
-install.packages("tensorflow")
-install.packages("keras")
-
-library(tensorflow)
-
-install_tensorflow()
-
-ncol(XtslaTrain)
-tslaNNFit = keras::keras_model_sequential() %>%
-  keras::layer_flatten() %>%
-  keras::layer_dense(units = 16,activation = "relu", name = "L1") %>%
-  keras::layer_dense(units = 16,activation = "relu", name = "L2") %>%
-  keras::layer_dense(units = 2, activation = "softmax", name = "output")
-
-
-tslaNNFit = keras::keras_model_sequential() %>%
-  XtslaNNScaled %>%
-  layer_flatten() %>%
-  keras::layer_dense(units = 16,activation = "relu", name = "L1") %>%
-  keras::layer_dense(units = 16,activation = "relu", name = "L2") %>%
-  keras::layer_dense(units = 2, activation = "softmax", name = "output")
-
-tensorflow.keras
-```
-
-
-
-
-
-
-###Final Task
-```{r dailySentiments}
-tslaSentiments = tsla_news %>%
-  group_by(Date) %>%
-  summarise(tslaSentimentsSum = sum(Sentiment, na.rm = TRUE),
-                                mean(Sentiment, na.rm = TRUE))
-
-googSentiments = goog_news %>%
-  group_by(Date) %>%
-  summarise(googSentimentsSum = sum(Sentiment, na.rm = TRUE), 
-                                mean(Sentiment, na.rm = TRUE))
-```
-##### 7 - Final Task without sentiments (updated from Task 3) 
+###### 7 - Final Task without sentiments (updated from Task 3) 
 ```{r dataTransformation Task3}
 #See {r dummyVarForLogisticRegression}
 ####TSLA
@@ -2486,7 +1491,7 @@ knitr::kable(
 
 ####Nonlinear Methods
 
-#####MARS
+####MARS
 ```{r MARS_Task3}
 set.seed(2020)
 #trControl = caret::trainControl(method = "repeatedcv", repeats = 2, number = 10)
@@ -2651,7 +1656,7 @@ plot(marsGoogSRdummyvip)
 
 ```
 
-#####Classification Tree
+####Classification Tree
 
 ```{r classificationTree}
 set.seed(2022)
@@ -2737,7 +1742,7 @@ rpartOut_GoogSRdummy$finalModel
 
 ```
 
-#####Random Forest
+####Random Forest
 
 ```{r randomForest}
 set.seed(2020)
@@ -2839,7 +1844,7 @@ knitr::kable(
 
 ```
 
-#####Boosting
+####Boosting
 
 ```{r boosting}
 set.seed(2020)
@@ -2984,7 +1989,7 @@ knitr::kable(
 
 ```
 
-#####Performance Review
+####Performance Review
 
 ```{r importanceBoosting}
 ####TSLA
@@ -3227,7 +2232,110 @@ axis(1, labels = names(resultsTestClass_Goog), at = 1:ncol(resultsTestClass_Goog
 
 
 
-##### 8 - Final Task with sentiments (updated from Task 3) 
+###### 8 - Final Task with sentiments (updated from Task 3) 
+
+```{r data}
+tslaAddVolTrendRemoveNA = tslaAddVolTrend %>%
+  na.omit(.)
+tslaFullStandardized =  tslaAddVolTrendRemoveNA %>%
+  caret::preProcess(method = c("center","scale")) %>%
+  predict(newdata =tslaAddVolTrendRemoveNA)
+
+
+###TSLA
+tslaY  = tslaFullStandardized %>%
+  dplyr::select(Date,diffHighLow, stockReturn) %>%
+  dplyr::as_tibble() %>%
+  dplyr::slice(-1) %>%
+  mutate(stockReturnDummy = if_else(stockReturn >= 0, 1, 0))
+
+tslaX    = tslaFullStandardized %>%
+  .[1:(nrow(.)-1),] %>%
+  dplyr::as_tibble(.) 
+
+names(tslaY)[2] = "diffHighLowTomorrow" #Y1
+names(tslaY)[3] = "stockReturnTomorrow" #Y2
+names(tslaY)[4] = "stockReturnTomorrowDummy" #Y3
+nrow(tslaX)
+nrow(tslaY)
+#####Dummy Variables
+###TSLA
+XtslaAddLevels = tslaX %>%
+  mutate(aboveR1 = factor(ifelse(PX_HIGH > R1, "Yes", "No"))) %>%
+  mutate(aboveR2 = factor(ifelse(PX_HIGH > R2, "Yes", "No"))) %>%
+  mutate(aboveR3 = factor(ifelse(PX_HIGH > R3, "Yes", "No"))) %>%
+  mutate(belowS1 = factor(ifelse(PX_LOW  < S1, "Yes", "No"))) %>%
+  mutate(belowS2 = factor(ifelse(PX_LOW  < S2, "Yes", "No"))) %>%
+  mutate(belowS3 = factor(ifelse(PX_LOW  < S3, "Yes", "No"))) %>%
+  select(aboveR1, aboveR2, aboveR3, belowS1, belowS2, belowS3)            
+XtslaDummyModel = caret::dummyVars(~ ., data = XtslaAddLevels, fullRank = TRUE)
+
+nrow(XtslaAddLevels)
+
+YtslaAddLevels = as_tibble(factor(ifelse(tslaY$stockReturnTomorrow > 0, "Increased", "Decreased"))) 
+YtslaDummyModel = caret::dummyVars(~ ., data = YtslaAddLevels, fullRank = TRUE)
+
+
+
+XtslaDummy = as_tibble(predict(XtslaDummyModel, XtslaAddLevels))
+
+YtslaDummy = as_tibble(predict(YtslaDummyModel, YtslaAddLevels))
+names(YtslaDummy)[1] = "stockReturnTomorrowDummy" #Y2
+
+nrow(XtslaDummy)
+nrow(YtslaDummy)
+
+#tslaFullWithDummy = tslaFullStandardized %>% 
+#  mutate(XtslaDummy) %>% 
+#  dplyr::select(-R1,-S1,-R2,-S2,-R3,-S3) %>% 
+#  #Drop PP, R1, R2, R3, S1, S2, S3 
+#  mutate(YtslaDummy) 
+
+XtslaWithDummy = tslaX %>%
+  mutate(XtslaDummy) %>% 
+  dplyr::select(-R1,-S1,-R2,-S2,-R3,-S3)
+
+XtslaWithoutDummy = tslaX %>%
+  dplyr::select(-R1,-S1,-R2,-S2,-R3,-S3)
+
+YtslaWithDummy = tslaY %>% mutate(YtslaDummy) 
+
+
+
+
+
+
+
+
+#Correlation between stock data of today and difference between highest and lowest stock prices on tomorrow is much higher than correlation between stock data of today and daily stock return on tomorrow. Thus, it's suggested to use "diffHighLowTomorrow " as the supervisor in model fitting.
+
+#summary(tslaY$diffHighLowTomorrow)
+
+##GOOG
+googY  = googAddVolTrend %>%
+  na.omit() %>%
+  dplyr::select(diffHighLow, stockReturn) %>%
+  dplyr::as_tibble() %>%
+  dplyr::slice(-1) %>%
+  mutate(stockReturnDummy = if_else(stockReturn >= 0, 1, 0))
+
+
+googX    = googAddVolTrend %>%
+  na.omit() %>%
+  .[1:(nrow(.)-1),] %>%
+  dplyr::as_tibble(.) 
+
+names(googY)[1] = "diffHighLowTomorrow" #Y1
+names(googY)[2] = "stockReturnTomorrow" #Y2
+names(googY)[3] = "stockReturnTomorrowDummy" #Y3
+
+googFull = dplyr::as_tibble(cbind(googY,googX))
+
+```
+
+
+
+
 ```{r dataTransformation Task3}
 #See {r dummyVarForLogisticRegression}
 ####TSLA
