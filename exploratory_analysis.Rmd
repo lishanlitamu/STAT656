@@ -2382,19 +2382,19 @@ plot(YhatTrainGlmnetGoogSR, residualsGoogSR_SentiSum,
 ```
 
 ####Logistic Classification
-```{r logisticClassification}
+```{r logisticClassificationSum}
 set.seed(2020)
 trControl = caret::trainControl(method = "repeatedcv", repeats = 5, number = 10)
 tuneGridTslaSRdummy = expand.grid('alpha' = c(0,.25,.5,.75,1),
                                   'lambda' = seq(0.000001, .001, length.out = 30))
 elasticOutTslaSRdummy_SentiSum = train(x = XtrainSentiSum_tslaSRdummy, 
-                              y = as.factor(Ytrain_tslaSRdummy),
+                              y = as.factor(Ytrain_tslaSRdummy_),
                               method = 'glmnet',
                               trControl = trControl, 
                               tuneGrid = tuneGridTslaSRdummy)
 
 glmnetOutTslaSRdummy_SentiSum = glmnet(x = XtrainMatSentiSum_tslaSRdummy, 
-                              y = as.factor(Ytrain_tslaSRdummy),
+                              y = as.factor(Ytrain_tslaSRdummy_),
                               alpha = 0.25,
                               family = 'binomial')
 probHatTestSentiSum_TslaSRdummy = predict(glmnetOutTslaSRdummy_SentiSum,
@@ -2407,17 +2407,18 @@ YhatTestSentiSum_TslaSRdummy       = predict(elasticOutTslaSRdummy_SentiSum,
                                              XtestMatSentiSum_tslaSRdummy,
                                      s = elasticOutTslaSRdummy_SentiSum$lambda, 
                                      type = 'raw')
-#length(YhatTest_TslaSRdummy)
-#nrow(XtestMatSentiSum_tslaSRdummy)
+
 #Cross-check they're the same. #Lecture 23 notes.
-#table(YhatTestSentiSum_TslaSRdummy,YhatTest_TslaSRdummy)
+table(YhatTestSentiSum_TslaSRdummy,YhatTestSentiSum_TslaSRdummy)
+
 
 betaHatGlmnetTslaSRdummy_SentiSum = coef(glmnetOutTslaSRdummy_SentiSum, 
                                 s = elasticOutTslaSRdummy_SentiSum$bestTune$lambda)
 #Accuracy
 accuracyLinearSentiSum_TslaSRdummy = mean(YhatTestSentiSum_TslaSRdummy==Ytest_tslaSRdummy)
+
 probHatTestSentiSum_TslaSRdummy_ = predict(elasticOutTslaSRdummy_SentiSum,
-                                           XtestMat_tslaSRdummy,
+                                           XtestMatSentiSum_tslaSRdummy,
                                    s = elasticOutTslaSRdummy_SentiSum$bestTune$lambda,
                                    type = 'prob')
 rocOutSentiSum_TslaSRdummy = pROC::roc(response = Ytest_tslaSRdummy,                   
@@ -2435,56 +2436,61 @@ set.seed(2020)
 
 tuneGridGoogSRdummy = expand.grid('alpha' = c(0,.25,.5,.75,1),
                                   'lambda' = seq(0.000001, .001, length.out = 30))
-elasticOutGoogSRdummy = train(x = Xtrain_googSRdummy, 
+elasticOutGoogSRdummy_SentiSum = train(x = XtrainSentiSum_googSRdummy, 
                               y = as.factor(Ytrain_googSRdummy),
                               method = 'glmnet',
                               trControl = trControl, 
                               tuneGrid = tuneGridGoogSRdummy)
-elasticOutGoogSRdummy$bestTune$alpha
 
-glmnetOutGoogSRdummy = glmnet(x = XtrainMat_googSRdummy, 
+
+glmnetOutGoogSRdummy_SentiSum = glmnet(x = XtrainMatSentiSum_googSRdummy, 
                               y = as.factor(Ytrain_googSRdummy),
                               alpha = 0.25,
                               family = 'binomial')
-probHatTest_GoogSRdummy = predict(glmnetOutGoogSRdummy, XtestMat_googSRdummy,
-                                  s = elasticOutGoogSRdummy$bestTune$lambda,
+probHatTestSentiSum_GoogSRdummy = predict(glmnetOutGoogSRdummy_SentiSum,
+                                           XtestMatSentiSum_googSRdummy,
+                                  s = elasticOutGoogSRdummy_SentiSum$bestTune$lambda,
                                   type = 'response')
 
-YhatTestGlmnet_GoogSRdummy = ifelse(probHatTest_GoogSRdummy > 0.5, '1', '0')
-YhatTest_GoogSRdummy       = predict(elasticOutGoogSRdummy,XtestMat_googSRdummy,
-                                     s = elasticOutGoogSRdummy$lambda, 
+YhatTestGlmnetSentiSum_GoogSRdummy = ifelse(probHatTest_GoogSRdummy_SentiSum > 0.5,
+                                             '1', '0')
+YhatTestSentiSum_GoogSRdummy       = predict(elasticOutGoogSRdummy_SentiSum,
+                                             XtestMatSentiSum_googSRdummy,
+                                     s = elasticOutGoogSRdummy_SentiSum$lambda, 
                                      type = 'raw')
 
 #Cross-check they're the same. #Lecture 23 notes.
-table(YhatTest_GoogSRdummy,YhatTest_GoogSRdummy)
+table(YhatTestSentiSum_GoogSRdummy,YhatTestSentiSum_GoogSRdummy)
 
-betaHatGlmnetGoogSRdummy = coef(glmnetOutGoogSRdummy, 
-                                s = elasticOutGoogSRdummy$bestTune$lambda)
+betaHatGlmnetGoogSRdummy_SentiSum = coef(glmnetOutGoogSRdummy_SentiSum, 
+                                s = elasticOutGoogSRdummy_SentiSum$bestTune$lambda)
 #Accuracy
-accuracyLinear_GoogSRdummy = mean(YhatTest_GoogSRdummy==Ytest_googSRdummy)
-probHatTest_GoogSRdummy_ = predict(elasticOutGoogSRdummy,XtestMat_googSRdummy,
-                                   s = elasticOutGoogSRdummy$bestTune$lambda,
+accuracyLinearSentiSum_GoogSRdummy = mean(YhatTestSentiSum_GoogSRdummy==Ytest_googSRdummy)
+probHatTestSentiSum_GoogSRdummy_ = predict(elasticOutGoogSRdummy_SentiSum,
+                                           XtestMatSentiSum_googSRdummy,
+                                   s = elasticOutGoogSRdummy_SentiSum$bestTune$lambda,
                                    type = 'prob')
-rocOut_GoogSRdummy = pROC::roc(response = Ytest_googSRdummy,                   
-                               probHatTest_GoogSRdummy_[,2])
+rocOutSentiSum_GoogSRdummy = pROC::roc(response = Ytest_googSRdummy,                   
+                                       probHatTestSentiSum_GoogSRdummy_[,2])
 
-plot(rocOut_GoogSRdummy, main = "ROC Plot - GOOG Stock Return (Dummy)")
+plot(rocOutSentiSum_GoogSRdummy, 
+     main = "ROC Plot - GOOG Stock Return (Dummy) with Sentiments(Sum)")
 
 
 
 #List of Accuracy
-accuracyLinear = rbind(
-  accuracyLinear_TslaSRdummy,
-  accuracyLinear_GoogSRdummy
+accuracyLinearSentiSum = rbind(
+  accuracyLinearSentiSum_TslaSRdummy,
+  accuracyLinearSentiSum_GoogSRdummy
   )
 
-row.names(accuracyLinear) = c("TSLA - Stock Return(dummy)", 
+row.names(accuracyLinearSentiSum) = c("TSLA - Stock Return(dummy)", 
                 "GOOG - Stock Return(dummy)")
 
 knitr::kable(
- accuracyLinear,
+ accuracyLinearSentiSum,
  col.names = c("Accuracy based on Testing data"),
- caption   = "Table 2: Accuracy - Logistic Elastic Net",
+ caption   = "Table 2: Accuracy - Logistic Elastic Net with Sentiments(Sum)",
  align     = "lccrr"
 )
 
@@ -2493,60 +2499,63 @@ knitr::kable(
 ####Nonlinear Methods
 
 ####MARS
-```{r MARS_Task3}
+```{r MARS_Sum}
 set.seed(2020)
-#trControl = caret::trainControl(method = "repeatedcv", repeats = 5, number = 10)
+cl = parallel::makeCluster(8)
+doParallel::registerDoParallel(cl)
+trControl = caret::trainControl(method = "repeatedcv", repeats = 5, number = 10)
 
 ###TSLA
 #Y1
 tuneGridTslaHL      = expand.grid(degree = 1:3,
                                   nprune = 10:35)
-marsOutTslaHL = train(x = XtrainMat_tslaHL, y = Ytrain_tslaHL,
+marsOutTslaHL_SentiSum = train(x = XtrainMatSentiSum_tslaHL, y = Ytrain_tslaHL,
                       method = 'earth', metric = 'RMSE',
                       tuneGrid = tuneGridTslaHL,
                       trControl = trControl)
-marsOutTslaHL$bestTune
 
-plot(marsOutTslaHL, main = "MARS Regression - TSLA diffHighLow")
-ggplot(marsOutTslaHL)+labs( title= "MARS Regression - TSLA diffHighLow")
+#plot(marsOutTslaHL_SentiSum, 
+#     main = "MARS Regression - TSLA diffHighLow with Sentiments(Sum)")
+#ggplot(marsOutTslaHL_SentiSum)+labs( title= "MARS Regression - TSLA diffHighLow")
 
 
 #Y2
 tuneGridTslaSR      = expand.grid(degree = 1:3,
                                   nprune = 10:35)
-marsOutTslaSR = train(x = XtrainMat_tslaSR, y = Ytrain_tslaSR,
+marsOutTslaSR_SentiSum = train(x = XtrainMatSentiSum_tslaSR, y = Ytrain_tslaSR,
                       method = 'earth', metric = 'RMSE',
                       tuneGrid = tuneGridTslaSR,
                       trControl = trControl)
-marsOutTslaSR$bestTune
-plot(marsOutTslaSR, main = "MARS Regression - TSLA stockReturn")
+
+#plot(marsOutTslaSR_SentiSum, 
+#     main = "MARS Regression - TSLA stockReturn with Sentiments(Sum)")
 
 
 #Y3
 tuneGridTslaSRdummy = expand.grid(degree = 1:3,
                                   nprune = c(10,20,50,100))
 
-#trControl_tslaSRdummy = caret::trainControl(method = "repeatedcv", repeats = 2, 
-#                                number = 5, classProbs = TRUE)
+trControl_tslaSRdummy = caret::trainControl(method = "repeatedcv", repeats = 2, 
+                                 number = 10, classProbs = TRUE)
 
 Ytrain_tslaSRdummy_ = as.factor(Ytrain_tslaSRdummy[Ytrain_tslaSRdummy == '1'|
                                                    Ytrain_tslaSRdummy == '0'])
 Ytrain_tslaSRdummy_ = relevel(Ytrain_tslaSRdummy_, ref = '0')
 levels(Ytrain_tslaSRdummy_) = c("No", "Yes")
 
-nrow(XtrainMat_tslaSRdummy)
-length(Ytrain_tslaSRdummy_)
+
 library(mda)
 set.seed(888)
-marsOutTslaSRdummy = train(x = XtrainMat_tslaSRdummy, 
+marsOutTslaSRdummy_SentiSum = train(x = XtrainMatSentiSum_tslaSRdummy, 
                            y = Ytrain_tslaSRdummy_,
                       method = 'fda',
                       metric = 'Accuracy',
                       tuneGrid = tuneGridTslaSRdummy,
                       trControl = trainControl(method = "CV",  
                                                number = 2, classProbs = TRUE))
-marsOutTslaSRdummy$bestTune
-plot(marsOutTslaSRdummy)
+
+#plot(marsOutTslaSRdummy,
+#     main = "MARS Regression - TSLA stockReturnDummy with Sentiments(Sum)")
 
 
 
@@ -2554,12 +2563,12 @@ plot(marsOutTslaSRdummy)
 #Y1
 tuneGridGoogHL      = expand.grid(degree = 1:3,
                                   nprune = 10:35)
-marsOutGoogHL = train(x = XtrainMat_googHL, y = Ytrain_googHL,
+marsOutGoogHL_SentiSum = train(x = XtrainMatSentiSum_googHL, y = Ytrain_googHL,
                       method = 'earth', metric = 'RMSE',
                       tuneGrid = tuneGridGoogHL,
                       trControl = trControl)
-marsOutGoogHL$bestTune
-ggplot(marsOutGoogHL)+labs( title= "MARS Regression - GOOG diffHighLow")
+
+#ggplot(marsOutGoogHL_SentiSum)+labs(title= "MARS Regression - GOOG diffHighLow with Sentiments(Sum)")
 
 #summary(marsOutGoogHL) %>% .$coefficients %>% head(10)
 
@@ -2567,12 +2576,13 @@ ggplot(marsOutGoogHL)+labs( title= "MARS Regression - GOOG diffHighLow")
 #Y2
 tuneGridGoogSR      = expand.grid(degree = 1:3,
                                   nprune = 10:35)
-marsOutGoogSR = train(x = XtrainMat_googSR, y = Ytrain_googSR,
+marsOutGoogSR_SentiSum = train(x = XtrainMatSentiSum_googSR, y = Ytrain_googSR,
                       method = 'earth', metric = 'RMSE',
                       tuneGrid = tuneGridGoogSR,
                       trControl = trControl)
-marsOutGoogSR$bestTune
-plot(marsOutGoogSR, main = "MARS Regression - GOOG stockReturn")
+
+#plot(marsOutGoogSR_SentiSum, 
+#     main = "MARS Regression - GOOG stockReturn with Sentiments(Sum)")
 #Y3
 tuneGridGoogSRdummy = expand.grid(degree = 1:3,
                                   nprune = c(10,20,50,100))
@@ -2586,78 +2596,82 @@ Ytrain_googSRdummy_ = relevel(Ytrain_googSRdummy_, ref = '0')
 levels(Ytrain_googSRdummy_) = c("No", "Yes")
 library(mda)
 set.seed(888)
-marsOutGoogSRdummy = train(x = XtrainMat_googSRdummy, 
+marsOutGoogSRdummy_SentiSum = train(x = XtrainMatSentiSum_googSRdummy, 
                            y = Ytrain_googSRdummy_,
                       method = 'fda',
                       metric = 'Accuracy',
                       tuneGrid = tuneGridGoogSRdummy,
                       trControl = trControl_googSRdummy)
 
-marsOutGoogSRdummy$bestTune
-plot(marsOutGoogSRdummy)
 
 
 ###Summary
-ggplot(marsOutTslaHL)+labs( title= "MARS Regression - TSLA diffHighLow")
-ggplot(marsOutTslaSR)+labs( title= "MARS Regression - TSLA stockReturn")
-ggplot(marsOutTslaSRdummy)+labs(title= "MARS Classification - TSLA stockReturn(dummy)")
-ggplot(marsOutGoogHL)+labs( title= "MARS Regression - GOOG diffHighLow")
-ggplot(marsOutGoogSR)+labs( title= "MARS Regression - GOOG stockReturn")
-ggplot(marsOutGoogSRdummy)+labs(title= "MARS Classification - GOOG stockReturn(dummy)")
+ggplot(marsOutTslaHL_SentiSum)+labs( title= "MARS Regression - TSLA diffHighLow with Sentiments(Sum)")
+ggplot(marsOutTslaSR_SentiSum)+labs( title= "MARS Regression - TSLA stockReturn with Sentiments(Sum)")
+ggplot(marsOutTslaSRdummy_SentiSum)+labs(title= "MARS Classification - TSLA stockReturn(dummy) with Sentiments(Sum)")
+ggplot(marsOutGoogHL_SentiSum)+labs( title= "MARS Regression - GOOG diffHighLow with Sentiments(Sum)")
+ggplot(marsOutGoogSR_SentiSum)+labs( title= "MARS Regression - GOOG stockReturn with Sentiments(Sum)")
+ggplot(marsOutGoogSRdummy_SentiSum)+labs(title= "MARS Classification - GOOG stockReturn(dummy) with Sentiments(Sum)")
 
 #List of Tuning Parameters
-tuneParaMars = rbind(
-  marsOutTslaHL$bestTune,
-  marsOutTslaSR$bestTune,
-  marsOutTslaSRdummy$bestTune,
-  marsOutGoogHL$bestTune,
-  marsOutGoogSR$bestTune,
-  marsOutGoogSRdummy$bestTune
+tuneParaMars_SentiSum = rbind(
+  marsOutTslaHL_SentiSum$bestTune,
+  marsOutTslaSR_SentiSum$bestTune,
+  marsOutTslaSRdummy_SentiSum$bestTune,
+  marsOutGoogHL_SentiSum$bestTune,
+  marsOutGoogSR_SentiSum$bestTune,
+  marsOutGoogSRdummy_SentiSum$bestTune
   )
 
 
-row.names(tuneParaMars) = c("TSLA - diffHighLow", "TSLA - stockReturn", 
+row.names(tuneParaMars_SentiSum) = c("TSLA - diffHighLow", "TSLA - stockReturn", 
                             "TSLA - stockReturn(Dummy)","GOOG - diffHighLow", 
                             "GOOG - stockReturn","GOOG - stockReturn(Dummy)")
 
 knitr::kable(
- tuneParaMars,
+ tuneParaMars_SentiSum,
  col.names = c("nprune", "degree"),
- caption   = "Table 3: MARS regression and Classification - Tuning Parameters",
+ caption   = "Table 3: MARS regression and Classification - Tuning Parameters ( with Sentiments(Sum))",
  align     = "lccrr"
 )
 
 #Importance
 
-marsTslaHLvip = vip(marsOutTslaHL, num_features = 50, bar = FALSE, value = "gcv") +
-  ggtitle("Plot of Variable Importance: TSLA - diffHighLow")
-plot(marsTslaHLvip)
+marsTslaHLvip_SentiSum = vip(marsOutTslaHL_SentiSum, num_features = 50, 
+                             bar = FALSE, value = "gcv") +
+  ggtitle("Plot of Variable Importance with Sentiments(Sum): TSLA - diffHighLow")
+plot(marsTslaHLvip_SentiSum)
 
-marsTslaSRvip = vip(marsOutTslaSR, num_features = 50, bar = FALSE, value = "gcv") +
-  ggtitle("Plot of Variable Importance: TSLA - stockReturn")
-plot(marsTslaSRvip)
+marsTslaSRvip_SentiSum = vip(marsOutTslaSR_SentiSum, num_features = 50, 
+                             bar = FALSE, value = "gcv") +
+  ggtitle("Plot of Variable Importance with Sentiments(Sum): TSLA - stockReturn")
+plot(marsTslaSRvip_SentiSum)
 
-marsTslaSRdummyvip = vip(marsOutTslaSRdummy, num_features = 50, bar = FALSE, value = "gcv") + ggtitle("Plot of Variable Importance: TSLA - stockReturn(dummy)")
-plot(marsTslaSRdummyvip)
+marsTslaSRdummyvip_SentiSum = vip(marsOutTslaSRdummy_SentiSum, num_features = 50, 
+                                  bar = FALSE, value = "gcv") + ggtitle("Plot of Variable Importance with Sentiments(Sum): TSLA - stockReturn(dummy)")
+plot(marsTslaSRdummyvip_SentiSum)
 
 
-marsGoogHLvip = vip(marsOutGoogHL, num_features = 50, bar = FALSE, value = "gcv") +
-  ggtitle("Plot of Variable Importance: GOOG - diffHighLow")
-plot(marsGoogHLvip)
+marsGoogHLvip_SentiSum = vip(marsOutGoogHL_SentiSum, num_features = 50, 
+                             bar = FALSE, value = "gcv") +
+  ggtitle("Plot of Variable Importance with Sentiments(Sum): GOOG - diffHighLow")
+plot(marsGoogHLvip_SentiSum)
 
-marsGoogSRvip = vip(marsOutGoogSR, num_features = 50, bar = FALSE, value = "gcv") +
-  ggtitle("Plot of Variable Importance: GOOG - stockReturn")
-plot(marsGoogSRvip)
+marsGoogSRvip_SentiSum = vip(marsOutGoogSR_SentiSum, num_features = 50, 
+                             bar = FALSE, value = "gcv") +
+  ggtitle("Plot of Variable Importance with Sentiments(Sum): GOOG - stockReturn")
+plot(marsGoogSRvip_SentiSum)
 
-marsGoogSRdummyvip = vip(marsOutGoogSRdummy, num_features = 50, bar = FALSE, value = "gcv") + ggtitle("Plot of Variable Importance: GOOG - stockReturn(dummy)")
-plot(marsGoogSRdummyvip)
+marsGoogSRdummyvip_SentiSum = vip(marsOutGoogSRdummy_SentiSum, num_features = 50, 
+                                  bar = FALSE, value = "gcv") + ggtitle("Plot of Variable Importance with Sentiments(Sum): GOOG - stockReturn(dummy)")
+plot(marsGoogSRdummyvip_SentiSum)
 
 
 ```
 
 ####Classification Tree
 
-```{r classificationTree}
+```{r classificationTreeSum}
 set.seed(2022)
 cl = parallel::makeCluster(8)
 doParallel::registerDoParallel(cl)
@@ -2666,88 +2680,96 @@ doParallel::registerDoParallel(cl)
 #                                number = 10, classProbs = TRUE)
 #Y1
 tuneGridTree_TslaHL = expand.grid(cp = c(0.0001,0.001,0.01,0.1,0.15,0.5,1))
-rpartOut_TslaHL     = train(x = XtrainMat_tslaHL, y = Ytrain_tslaHL,
+rpartOutSentiSum_TslaHL     = train(x = XtrainMatSentiSum_tslaHL, y = Ytrain_tslaHL,
                             method = "rpart",
                             tuneGrid = tuneGridTree_TslaHL,
                             trControl = trControl)
-plot(rpartOut_TslaHL$finalModel, margin = rep(.1,4),
-     main = "Classification Tree - TSLA diffHighLow")
-text(rpartOut_TslaHL$finalModel, cex = 0.6, digits = 1)
+plot(rpartOutSentiSum_TslaHL$finalModel, margin = rep(.1,4),
+     main = "Classification Tree with Sentiments(Sum) - TSLA diffHighLow")
+text(rpartOutSentiSum_TslaHL$finalModel, cex = 0.6, digits = 1)
+
 
 
 #Y2
 tuneGridTree_TslaSR = expand.grid(cp = c(0.0001,0.001,0.01,0.1,0.15,0.5,1))
-rpartOut_TslaSR     = train(x = XtrainMat_tslaSR, y = Ytrain_tslaSR,
+rpartOutSentiSum_TslaSR     = train(x = XtrainMatSentiSum_tslaSR, y = Ytrain_tslaSR,
                             method = "rpart",
                             tuneGrid = tuneGridTree_TslaSR,
                             trControl = trControl,
                             control = rpart.control(minsplit = 1, minbucket = 1))
-rpartOut_TslaSR$finalModel #just a root
+rpartOutSentiSum_TslaSR$finalModel #just a root
 #plot(rpartOut_TslaSR$finalModel, margin = rep(.1,4))
 #text(rpartOut_TslaSR$finalModel, cex = 0.6, digits = 1)
 
 
 #Y3
 tuneGridTree_TslaSRdummy = expand.grid(cp = c(0,0.0001,0.001,0.01,0.1,0.15,0.5,1))
-rpartOut_TslaSRdummy     = train(x = XtrainMat_tslaSRdummy, 
+rpartOutSentiSum_TslaSRdummy     = train(x = XtrainMatSentiSum_tslaSRdummy, 
                                  y = Ytrain_tslaSRdummy_,
                             method = "rpart",
                             #parms = list(prior = c(.65,.35),split = "gini"),
                             parms = list(split = "gini"),
                             tuneGrid = tuneGridTree_TslaSRdummy,
                             trControl = trControl)
-#plot(rpartOut_TslaSRdummy$finalModel, margin = rep(.1,4),
-#     main = "Classification Tree - TSLA stockReturn(dummy)")
-#text(rpartOut_TslaSRdummy$finalModel, cex = 0.6, digits = 1)
+
+plot(rpartOutSentiSum_TslaSRdummy$finalModel, margin = rep(.1,4),
+    main = "Classification Tree with Sentiments(Sum) - TSLA stockReturn(dummy)")
+text(rpartOutSentiSum_TslaSRdummy$finalModel, cex = 0.6, digits = 1)
 
 
 
 ####GOOG
+set.seed(2022)
+cl = parallel::makeCluster(8)
+doParallel::registerDoParallel(cl)
 #trControl = caret::trainControl(method = "repeatedcv", repeats = 5, 
                                # number = 10, classProbs = TRUE)
 #Y1
 tuneGridTree_GoogHL = expand.grid(cp = c(0,0.0001,0.001,0.01,0.1,0.15,0.5,1))
-rpartOut_GoogHL     = train(x = XtrainMat_googHL, y = Ytrain_googHL,
+rpartOutSentiSum_GoogHL     = train(x = XtrainMatSentiSum_googHL, y = Ytrain_googHL,
                             method = "rpart",
                             tuneGrid = tuneGridTree_GoogHL,
                             trControl = trControl,
                             control = rpart.control(minsplit = 1, 
                                                     minbucket = 1))
-plot(rpartOut_GoogHL$finalModel, margin = rep(.1,4),
-     main = "Classification Tree - GOOG diffHighLow")
+plot(rpartOutSentiSum_GoogHL$finalModel, margin = rep(.1,4),
+     main = "Classification Tree with Sentiments(Sum) - GOOG diffHighLow")
 text(rpartOut_GoogHL$finalModel, cex = 0.6, digits = 1)
+
 #Y2
 tuneGridTree_GoogSR = expand.grid(cp = c(0,0.0001,0.001,0.01,0.1,0.15,0.5,1))
-rpartOut_GoogSR     = train(x = XtrainMat_googSR, y = Ytrain_googSR,
+rpartOutSentiSum_GoogSR = train(x = XtrainMatSentiSum_googSR, y = Ytrain_googSR,
                             method = "rpart",
                             tuneGrid = tuneGridTree_GoogSR,
                             trControl = trControl,
                             control = rpart.control(minsplit = 1, minbucket = 1))
-rpartOut_GoogSR$finalModel #just a root
+rpartOutSentiSum_GoogSR$finalModel #just a root
 #plot(rpartOut_GoogSR$finalModel, margin = rep(.1,4))
 #text(rpartOut_TslaSR$finalModel, cex = 0.6, digits = 1)
 
 
 #Y3
+
 tuneGridTree_GoogSRdummy = expand.grid(cp = c(0,0.0001,0.001,0.01,0.05,0.1,0.15,1))
-rpartOut_GoogSRdummy     = train(x = XtrainMat_googSRdummy, 
+rpartOutSentiSum_GoogSRdummy     = train(x = XtrainMatSentiSum_googSRdummy, 
                                  y = Ytrain_googSRdummy_,
                             method = "rpart",
                             parms = list(split = "gini"),
                             tuneGrid = tuneGridTree_GoogSRdummy,
                             trControl = trControl,
                             control = rpart.control(minsplit = 1, minbucket = 1))
-#one root
-rpartOut_GoogSRdummy$finalModel
-#plot(rpartOut_GoogSRdummy$finalModel, margin = rep(.1,4))
-#text(rpartOut_GoogSRdummy$finalModel, cex = 0.6, digits = 1)
+
+#rpartOutSentiSum_GoogSRdummy$finalModel
+plot(rpartOutSentiSum_GoogSRdummy$finalModel, margin = rep(.1,4),
+     main = "Classification Tree with Sentiments(Sum) - GOOG stockReturnDummy")
+text(rpartOutSentiSum_GoogSRdummy$finalModel, cex = 0.6, digits = 1)
 
 
 ```
 
 ####Random Forest
 
-```{r randomForest}
+```{r randomForestSum}
 set.seed(2020)
 cl = parallel::makeCluster(8)
 doParallel::registerDoParallel(cl)
@@ -2755,98 +2777,105 @@ doParallel::registerDoParallel(cl)
 #trControl = caret::trainControl(method = "repeatedcv", repeats = 5, 
 #                                number = 10, classProbs = TRUE)
 #Y1
-tuneGridRanger_TslaHL = data.frame(splitrule = "variance", min.node.size = 5,
-                                   mtry = round(sqrt(ncol(Xtrain_tslaHL))))
-rfOut_tslaHL  = train(x = XtrainMat_tslaHL, y = Ytrain_tslaHL, 
+tuneGridRangerSentiSum_TslaHL = data.frame(splitrule = "variance", min.node.size = 5,
+                                   mtry = round(sqrt(ncol(XtrainSentiSum_tslaHL))))
+rfOutSentiSum_tslaHL  = train(x = XtrainMatSentiSum_tslaHL, y = Ytrain_tslaHL, 
                       method = "ranger",
                       num.trees = 500,
-                      tuneGrid = tuneGridRanger_TslaHL, 
+                      tuneGrid = tuneGridRangerSentiSum_TslaHL, 
                       importance = "permutation",
                       trControl = trControl)
-rfOut_tslaHL$finalModel
+#rfOutSentiSum_tslaHL$finalModel
 
 #print(rfOut_tslaHL)
+
 #Y2
-tuneGridRanger_TslaSR = data.frame(splitrule = "variance", min.node.size = 5,
-                                   mtry = round(sqrt(ncol(Xtrain_tslaSR))))
-rfOut_tslaSR  = train(x = XtrainMat_tslaSR, y = Ytrain_tslaSR, 
+tuneGridRangerSentiSum_TslaSR = data.frame(splitrule = "variance", min.node.size = 5,
+                                   mtry = round(sqrt(ncol(XtrainSentiSum_tslaSR))))
+rfOutSentiSum_tslaSR  = train(x = XtrainMatSentiSum_tslaSR, y = Ytrain_tslaSR, 
                       method = "ranger",
                       num.trees = 500,
-                      tuneGrid = tuneGridRanger_TslaSR, 
+                      tuneGrid = tuneGridRangerSentiSum_TslaSR, 
                       importance = "permutation",
                       trControl = trControl)
-rfOut_tslaSR$finalModel
+#rfOutSentiSum_tslaSR$finalModel
 
 #Y3
-tuneGridRanger_TslaSRdummy = data.frame(splitrule = "gini", min.node.size = 10,
-                                   mtry = round(sqrt(ncol(Xtrain_tslaSRdummy))))
-rfOut_tslaSRdummy  = train(x = XtrainMat_tslaSRdummy, 
+set.seed(2020)
+cl = parallel::makeCluster(8)
+doParallel::registerDoParallel(cl)
+
+tuneGridRangerSentiSum_TslaSRdummy = data.frame(splitrule = "gini", min.node.size = 10,
+                                   mtry = round(sqrt(ncol(XtrainSentiSum_tslaSRdummy))))
+rfOutSentiSum_tslaSRdummy  = train(x = XtrainMatSentiSum_tslaSRdummy, 
                            y = as.matrix(Ytrain_tslaSRdummy_) , 
                       method = "ranger",
                       num.trees = 500,
-                      tuneGrid = tuneGridRanger_TslaSRdummy, 
+                      tuneGrid = tuneGridRangerSentiSum_TslaSRdummy, 
                       importance = "permutation",
                       trControl = trControl,
                       classification = TRUE)
-rfOut_tslaSRdummy$finalModel
+#rfOutSentiSum_tslaSRdummy$finalModel
 
 ####GOOG
 #trControl = caret::trainControl(method = "repeatedcv", repeats = 5, 
 #                                number = 10, classProbs = TRUE)
 #Y1
-tuneGridRanger_GoogHL = data.frame(splitrule = "variance", min.node.size = 5,
-                                   mtry = round(sqrt(ncol(Xtrain_googHL))))
-rfOut_googHL  = train(x = XtrainMat_googHL, y = Ytrain_googHL, 
+
+tuneGridRangerSentiSum_GoogHL = data.frame(splitrule = "variance", min.node.size = 5,
+                                   mtry = round(sqrt(ncol(XtrainSentiSum_googHL))))
+rfOutSentiSum_googHL  = train(x = XtrainMatSentiSum_googHL, y = Ytrain_googHL, 
                       method = "ranger",
                       num.trees = 500,
-                      tuneGrid = tuneGridRanger_GoogHL, 
+                      tuneGrid = tuneGridRangerSentiSum_GoogHL, 
                       importance = "permutation",
                       trControl = trControl)
-rfOut_googHL$finalModel
+#rfOutSentiSum_googHL$finalModel
 
 #Y2
-tuneGridRanger_GoogSR = data.frame(splitrule = "variance", min.node.size = 5,
-                                   mtry = round(sqrt(ncol(Xtrain_googSR))))
-rfOut_googSR  = train(x = XtrainMat_googSR, y = Ytrain_googSR, 
+
+tuneGridRangerSentiSum_GoogSR = data.frame(splitrule = "variance", min.node.size = 5,
+                                   mtry = round(sqrt(ncol(XtrainSentiSum_googSR))))
+rfOutSentiSum_googSR  = train(x = XtrainMatSentiSum_googSR, y = Ytrain_googSR, 
                       method = "ranger",
                       num.trees = 500,
-                      tuneGrid = tuneGridRanger_GoogSR, 
+                      tuneGrid = tuneGridRangerSentiSum_GoogSR, 
                       importance = "permutation",
                       trControl = trControl)
-rfOut_googSR$finalModel
+rfOutSentiSum_googSR$finalModel
 
 #Y3
-
-tuneGridRanger_GoogSRdummy = data.frame(splitrule = "gini", min.node.size = 10,
-                                   mtry = round(sqrt(ncol(Xtrain_googSRdummy))))
-rfOut_googSRdummy  = train(x = XtrainMat_googSRdummy, y =as.matrix(Ytrain_googSRdummy_), 
+tuneGridRangerSentiSum_GoogSRdummy = data.frame(splitrule = "gini", min.node.size = 10,
+                                   mtry = round(sqrt(ncol(XtrainSentiSum_googSRdummy))))
+rfOutSentiSum_googSRdummy  = train(x = XtrainMatSentiSum_googSRdummy, 
+                                   y =as.matrix(Ytrain_googSRdummy_), 
                       method = "ranger",
                       num.trees = 500,
-                      tuneGrid = tuneGridRanger_GoogSRdummy, 
+                      tuneGrid = tuneGridRangerSentiSum_GoogSRdummy, 
                       importance = "permutation",
                       trControl = trControl)
-rfOut_googSRdummy$finalModel
+rfOutSentiSum_googSRdummy$finalModel
 
 
 #List of Tuning Parameters
-tuneParaRF = rbind(
-  rfOut_tslaHL$bestTune,
-  rfOut_tslaSR$bestTune,
-  rfOut_tslaSRdummy$bestTune,
-  rfOut_googHL$bestTune,
-  rfOut_googSR$bestTune,
-  rfOut_googSRdummy$bestTune
+tuneParaRFSentiSum = rbind(
+  rfOutSentiSum_tslaHL$bestTune,
+  rfOutSentiSum_tslaSR$bestTune,
+  rfOutSentiSum_tslaSRdummy$bestTune,
+  rfOutSentiSum_googHL$bestTune,
+  rfOutSentiSum_googSR$bestTune,
+  rfOutSentiSum_googSRdummy$bestTune
   )
 
 
-row.names(tuneParaRF) = c("TSLA - diffHighLow", "TSLA - stockReturn", 
+row.names(tuneParaRFSentiSum) = c("TSLA - diffHighLow", "TSLA - stockReturn", 
                             "TSLA - stockReturn(Dummy)","GOOG - diffHighLow", 
                             "GOOG - stockReturn","GOOG - stockReturn(Dummy)")
 
 knitr::kable(
- tuneParaRF,
+ tuneParaRFSentiSum,
  col.names = c("mtry", "splitrule", "min.node.size"),
- caption   = "Table 4: Random Forest regression and Classification - Tuning Parameters",
+ caption   = "Table 4: Random Forest regression and Classification with Sentiments(Sum) - Tuning Parameters",
  align     = "lccrr"
 )
 
@@ -2854,7 +2883,7 @@ knitr::kable(
 
 ####Boosting
 
-```{r boosting}
+```{r boostingSum}
 set.seed(2020)
 cl = parallel::makeCluster(8)
 doParallel::registerDoParallel(cl)
@@ -2868,11 +2897,11 @@ tuneGridRandom_TslaHL = expand.grid('nrounds'= c(50,150,500,1000,2000,3000),
                                    'min_child_weight' = 0,
                                    'subsample' = c(0.5, 0.8))
 
-boostOutRandom_TslaHL = train(x = Xtrain_tslaHL, y = Ytrain_tslaHL,
+boostOutRandomSentiSum_TslaHL = train(x = XtrainSentiSum_tslaHL, y = Ytrain_tslaHL,
                               method = 'xgbTree', verbose = 0,
                               tuneGrid = tuneGridRandom_TslaHL,
                               trControl = trControl)
-plot(boostOutRandom_TslaHL)
+plot(boostOutRandomSentiSum_TslaHL)
 
 #Y2
 
@@ -2884,16 +2913,16 @@ tuneGridRandom_TslaSR = expand.grid('nrounds'= c(50,150,500,1000,2000,3000),
                                    'min_child_weight' = 0,
                                    'subsample' = c(0.5, 0.8))
 
-boostOutRandom_TslaSR = train(x = Xtrain_tslaSR, y = Ytrain_tslaSR,
+boostOutRandomSentiSum_TslaSR = train(x = XtrainSentiSum_tslaSR, y = Ytrain_tslaSR,
                               method = 'xgbTree', verbose = 0,
                               tuneGrid = tuneGridRandom_TslaSR,
                               trControl = trControl)
-plot(boostOutRandom_TslaSR)
-boostOutRandom_TslaSR$bestTune$nrounds
+plot(boostOutRandomSentiSum_TslaSR)
+
 
 #Y3
-cl = parallel::makeCluster(8)
-doParallel::registerDoParallel(cl)
+
+
 tuneGridRandom_TslaSRdummy = expand.grid(
                                    'nrounds'= c(50,150,500,1000,2000,3000),
                                    'max_depth' = 6,
@@ -2903,12 +2932,12 @@ tuneGridRandom_TslaSRdummy = expand.grid(
                                    'min_child_weight' = 0,
                                    'subsample' = c(0.5, 0.8))
 
-boostOutRandom_TslaSRdummy = train(x = Xtrain_tslaSRdummy, 
+boostOutRandomSentiSum_TslaSRdummy = train(x = XtrainSentiSum_tslaSRdummy, 
                                    y = Ytrain_tslaSRdummy_,
                               method = 'xgbTree', verbose = 0,
                               tuneGrid = tuneGridRandom_TslaSRdummy,
                               trControl = trControl)
-plot(boostOutRandom_TslaSRdummy)
+plot(boostOutRandomSentiSum_TslaSRdummy)
 
 
 
@@ -2916,6 +2945,9 @@ plot(boostOutRandom_TslaSRdummy)
 
 
 ####GOOG
+set.seed(2020)
+cl = parallel::makeCluster(8)
+doParallel::registerDoParallel(cl)
 #Y1
 tuneGridRandom_GoogHL = expand.grid('nrounds'= c(50,150,500,1000,2000,3000),
                                    'max_depth' = 6,
@@ -2925,11 +2957,11 @@ tuneGridRandom_GoogHL = expand.grid('nrounds'= c(50,150,500,1000,2000,3000),
                                    'min_child_weight' = 0,
                                    'subsample' = c(0.5, 0.8))
 
-boostOutRandom_GoogHL = train(x = Xtrain_googHL, y = Ytrain_googHL,
+boostOutRandomSentiSum_GoogHL = train(x = XtrainSentiSum_googHL, y = Ytrain_googHL,
                               method = 'xgbTree', verbose = 0,
                               tuneGrid = tuneGridRandom_GoogHL,
                               trControl = trControl)
-plot(boostOutRandom_GoogHL)
+#plot(boostOutRandomSentiSum_GoogHL)
 
 #Y2
 tuneGridRandom_GoogSR = expand.grid('nrounds'= c(50,150,500,1000,2000,3000),
@@ -2940,12 +2972,12 @@ tuneGridRandom_GoogSR = expand.grid('nrounds'= c(50,150,500,1000,2000,3000),
                                    'min_child_weight' = 0,
                                    'subsample' = c(0.5, 0.8))
 
-boostOutRandom_GoogSR = train(x = Xtrain_googSR, y = Ytrain_googSR,
+boostOutRandomSentiSum_GoogSR = train(x = XtrainSentiSum_googSR, y = Ytrain_googSR,
                               method = 'xgbTree', verbose = 0,
                               tuneGrid = tuneGridRandom_GoogSR,
                               trControl = trControl)
-plot(boostOutRandom_GoogSR)
-boostOutRandom_GoogSR$bestTune$nrounds
+#plot(boostOutRandomSentiSum_GoogSR)
+#boostOutRandomSentiSum_GoogSR$bestTune$nrounds
 
 #Y3
 tuneGridRandom_GoogSRdummy = expand.grid(
@@ -2957,46 +2989,52 @@ tuneGridRandom_GoogSRdummy = expand.grid(
                                    'min_child_weight' = 0,
                                    'subsample' = c(0.5, 0.8))
 
-boostOutRandom_GoogSRdummy = train(x = Xtrain_googSRdummy, 
+boostOutRandomSentiSum_GoogSRdummy = train(x = XtrainSentiSum_googSRdummy, 
                                    y = Ytrain_googSRdummy_,
                               method = 'xgbTree', verbose = 0,
                               tuneGrid = tuneGridRandom_GoogSRdummy,
                               trControl = trControl)
-plot(boostOutRandom_GoogSRdummy)
+#plot(boostOutRandomSentiSum_GoogSRdummy)
 
-boostOutRandom_GoogSRdummy$bestTune
+#boostOutRandomSentiSum_GoogSRdummy$bestTune
 
 ###Overview
 
-plot(boostOutRandom_TslaHL, main = "Boosting: TSLA diffHighLow")
-plot(boostOutRandom_TslaSR, main = "Boosting: TSLA stockReturn")
-plot(boostOutRandom_TslaSRdummy, main = "Boosting: TSLA stockReturn(Dummy)")
+plot(boostOutRandomSentiSum_TslaHL, 
+     main = "Boosting with Sentiments(Sum): TSLA diffHighLow")
+plot(boostOutRandomSentiSum_TslaSR, 
+     main = "Boosting with Sentiments(Sum): TSLA stockReturn")
+plot(boostOutRandomSentiSum_TslaSRdummy, 
+     main = "Boosting with Sentiments(Sum): TSLA stockReturn(Dummy)")
 
-plot(boostOutRandom_GoogHL, main = "Boosting: GOOG diffHighLow")
-plot(boostOutRandom_GoogSR, main = "Boosting: GOOG stockReturn")
-plot(boostOutRandom_GoogSRdummy, main = "Boosting: GOOG stockReturn(Dummy)")
+plot(boostOutRandomSentiSum_GoogHL, 
+     main = "Boosting with Sentiments(Sum): GOOG diffHighLow")
+plot(boostOutRandomSentiSum_GoogSR, 
+     main = "Boosting with Sentiments(Sum): GOOG stockReturn")
+plot(boostOutRandomSentiSum_GoogSRdummy, 
+     main = "Boosting with Sentiments(Sum): GOOG stockReturn(Dummy)")
 
 
 #List of Tuning Parameters
-tuneParaBoost = rbind(
-  boostOutRandom_TslaHL$bestTune,
-  boostOutRandom_TslaSR$bestTune,
-  boostOutRandom_TslaSRdummy$bestTune,
-  boostOutRandom_GoogHL$bestTune,
-  boostOutRandom_GoogSR$bestTune,
-  boostOutRandom_GoogSRdummy$bestTune
+tuneParaBoostSentiSum = rbind(
+  boostOutRandomSentiSum_TslaHL$bestTune,
+  boostOutRandomSentiSum_TslaSR$bestTune,
+  boostOutRandomSentiSum_TslaSRdummy$bestTune,
+  boostOutRandomSentiSum_GoogHL$bestTune,
+  boostOutRandomSentiSum_GoogSR$bestTune,
+  boostOutRandomSentiSum_GoogSRdummy$bestTune
   )
 
 
-row.names(tuneParaBoost) = c("TSLA - diffHighLow", "TSLA - stockReturn", 
+row.names(tuneParaBoostSentiSum) = c("TSLA - diffHighLow", "TSLA - stockReturn", 
                             "TSLA - stockReturn(Dummy)","GOOG - diffHighLow", 
                             "GOOG - stockReturn","GOOG - stockReturn(Dummy)")
 
 knitr::kable(
- tuneParaBoost,
+ tuneParaBoostSentiSum,
  col.names = c("nrounds","max_depth","eta","gamma","colsample_bytree",
                "min_child_weight","subsample"),
- caption   = "Table 5: Boosting regression and Classification - Tuning Parameters",
+ caption   = "Table 5: Boosting regression and Classification with Sentiments(Sum)- Tuning Parameters",
  align     = "lccrr"
 )
 
@@ -3004,94 +3042,102 @@ knitr::kable(
 
 ####Performance Review
 
-```{r importanceBoosting}
+```{r importanceBoostingSum}
 ####TSLA
-(boostImportance_TslaHL = xgboost::xgb.importance(model = boostOutRandom_TslaHL$finalModel))
+(boostImportanceSentiSum_TslaHL = xgboost::xgb.importance(model = boostOutRandomSentiSum_TslaHL$finalModel))
 
-(boostImportance_TslaSR = xgboost::xgb.importance(model = boostOutRandom_TslaSR$finalModel))
+(boostImportanceSentiSum_TslaSR = xgboost::xgb.importance(model = boostOutRandomSentiSum_TslaSR$finalModel))
 
-(boostImportance_TslaSRdummy = xgboost::xgb.importance(model = boostOutRandom_TslaSRdummy$finalModel))
+(boostImportanceSentiSum_TslaSRdummy = xgboost::xgb.importance(model = boostOutRandomSentiSum_TslaSRdummy$finalModel))
 
 ####GOOG
-(boostImportance_GoogHL = xgboost::xgb.importance(model = boostOutRandom_GoogHL$finalModel))
+(boostImportanceSentiSum_GoogHL = xgboost::xgb.importance(model = boostOutRandomSentiSum_GoogHL$finalModel))
 
-(boostImportance_GoogSR = xgboost::xgb.importance(model = boostOutRandom_GoogSR$finalModel))
+(boostImportanceSentiSum_GoogSR = xgboost::xgb.importance(model = boostOutRandomSentiSum_GoogSR$finalModel))
 
-(boostImportance_GoogSRdummy = xgboost::xgb.importance(model = boostOutRandom_GoogSRdummy$finalModel))
+(boostImportanceSentiSum_GoogSRdummy = xgboost::xgb.importance(model = boostOutRandomSentiSum_GoogSRdummy$finalModel))
 ```
 
-```{r judgePerformance}
+```{r judgePerformanceSum}
 set.seed(2020)
 ################Regression
 ####TSLA
 #Y1
-resultsTest_TslaHL  = data.frame(
-  YhatGlmnet = c(predict(glmnetOutTslaHL, XtestMat_tslaHL,
-                         s = elasticOutTslaHL$bestTune$lambda)),
-  YhatMARS   = c(predict(marsOutTslaHL, XtestMat_tslaHL)),
-  YhatTrees  = predict(rpartOut_TslaHL, XtestMat_tslaHL),
-  YhatRF     = predict(rfOut_tslaHL, XtestMat_tslaHL),
-  YhatBoost  = predict(boostOutRandom_TslaHL, XtestMat_tslaHL)
+resultsTestSentiSum_TslaHL  = data.frame(
+  YhatGlmnet_SentiSum = c(predict(glmnetOutTslaHL_SentiSum, XtestMatSentiSum_tslaHL,
+                         s = elasticOutTslaHL_SentiSum$bestTune$lambda)),
+  YhatMARS_SentiSum   = c(predict(marsOutTslaHL_SentiSum, XtestMatSentiSum_tslaHL)),
+  YhatTrees_SentiSum  = predict(rpartOutSentiSum_TslaHL, XtestMatSentiSum_tslaHL),
+  YhatRF_SentiSum     = predict(rfOutSentiSum_tslaHL, XtestMatSentiSum_tslaHL),
+  YhatBoost_SentiSum  = predict(boostOutRandomSentiSum_TslaHL, XtestMatSentiSum_tslaHL)
 )
 
-par(mar=c(7,5,4,2))
-plot(1:length(resultsTest_TslaHL), 
-     sapply(resultsTest_TslaHL, function(Yhat){mean((Yhat - Ytest_tslaHL)^2)}),
+
+
+par(mar=c(10,5,4,2))
+plot(1:length(resultsTestSentiSum_TslaHL), 
+     sapply(resultsTestSentiSum_TslaHL, function(Yhat){mean((Yhat - Ytest_tslaHL)^2)}),
      xlab = '', xaxt = 'n', pch = 16, ylab = 'test error', 
-     main = 'TSLA - Supervisor = difference between highest and lowest prices')
-axis(1, labels = names(resultsTest_TslaHL), at = 1:ncol(resultsTest_TslaHL), las = 3)
+     main = 'TSLA with Sentiments(Sum) - Supervisor = difference between highest and lowest prices')
+axis(1, labels = names(resultsTestSentiSum_TslaHL), 
+     at = 1:ncol(resultsTestSentiSum_TslaHL), las = 3)
 
 #Y2
-resultsTest_TslaSR  = data.frame(
-  YhatGlmnet = c(predict(glmnetOutTslaSR, XtestMat_tslaSR,
-                         s = elasticOutTslaSR$bestTune$lambda)),
-  YhatMARS   = c(predict(marsOutTslaSR, XtestMat_tslaSR)),
-  YhatTrees  = predict(rpartOut_TslaSR, XtestMat_tslaSR),
-  YhatRF     = predict(rfOut_tslaSR, XtestMat_tslaSR),
-  YhatBoost  = predict(boostOutRandom_TslaSR, XtestMat_tslaSR)
+set.seed(2020)
+resultsTestSentiSum_TslaSR  = data.frame(
+  YhatGlmnet_SentiSum = c(predict(glmnetOutTslaSR_SentiSum, XtestMatSentiSum_tslaSR,
+                         s = elasticOutTslaSR_SentiSum$bestTune$lambda)),
+  YhatMARS_SentiSum   = c(predict(marsOutTslaSR_SentiSum, XtestMatSentiSum_tslaSR)),
+  YhatTrees_SentiSum  = predict(rpartOutSentiSum_TslaSR, XtestMatSentiSum_tslaSR),
+  YhatRF_SentiSum     = predict(rfOutSentiSum_tslaSR, XtestMatSentiSum_tslaSR),
+  YhatBoost_SentiSum  = predict(boostOutRandomSentiSum_TslaSR, XtestMatSentiSum_tslaSR)
 )
 
-par(mar=c(7,5,4,2))
-plot(1:length(resultsTest_TslaSR), 
-     sapply(resultsTest_TslaSR, function(Yhat){mean((Yhat - Ytest_tslaSR)^2)}),
+par(mar=c(10,5,4,2))
+plot(1:length(resultsTestSentiSum_TslaSR), 
+     sapply(resultsTestSentiSum_TslaSR, function(Yhat){mean((Yhat - Ytest_tslaSR)^2)}),
      xlab = '', xaxt = 'n', pch = 16, ylab = 'test error', 
-     main = 'TSLA - Supervisor = stock return')
-axis(1, labels = names(resultsTest_TslaSR), at = 1:ncol(resultsTest_TslaSR), las = 3)
+     main = 'TSLA with Sentiments(Sum) - Supervisor = stock return')
+axis(1, labels = names(resultsTestSentiSum_TslaSR), 
+     at = 1:ncol(resultsTestSentiSum_TslaSR), las = 3)
 
 ####GOOG
 #Y1
-resultsTest_GoogHL  = data.frame(
-  YhatGlmnet = c(predict(glmnetOutGoogHL, XtestMat_googHL,
-                         s = elasticOutGoogHL$bestTune$lambda)),
-  YhatMARS   = c(predict(marsOutGoogHL, XtestMat_googHL)),
-  YhatTrees  = predict(rpartOut_GoogHL, XtestMat_googHL),
-  YhatRF     = predict(rfOut_googHL, XtestMat_googHL),
-  YhatBoost  = predict(boostOutRandom_GoogHL, XtestMat_googHL)
+set.seed(2020)
+resultsTestSentiSum_GoogHL  = data.frame(
+  YhatGlmnet_SentiSum = c(predict(glmnetOutGoogHL_SentiSum, XtestMatSentiSum_googHL,
+                         s = elasticOutGoogHL_SentiSum$bestTune$lambda)),
+  YhatMARS_SentiSum   = c(predict(marsOutGoogHL_SentiSum, XtestMatSentiSum_googHL)),
+  YhatTrees_SentiSum  = predict(rpartOutSentiSum_GoogHL, XtestMatSentiSum_googHL),
+  YhatRF_SentiSum     = predict(rfOutSentiSum_googHL, XtestMatSentiSum_googHL),
+  YhatBoost_SentiSum  = predict(boostOutRandomSentiSum_GoogHL, XtestMatSentiSum_googHL)
 )
 
-par(mar=c(7,5,4,2))
-plot(1:length(resultsTest_GoogHL), 
-     sapply(resultsTest_GoogHL, function(Yhat){mean((Yhat - Ytest_googHL)^2)}),
+par(mar=c(10,5,4,2))
+plot(1:length(resultsTestSentiSum_GoogHL), 
+     sapply(resultsTestSentiSum_GoogHL, function(Yhat){mean((Yhat - Ytest_googHL)^2)}),
      xlab = '', xaxt = 'n', pch = 16, ylab = 'test error', 
-     main = 'GOOG - Supervisor = difference between highest and lowest prices')
-axis(1, labels = names(resultsTest_GoogHL), at = 1:ncol(resultsTest_GoogHL), las = 3)
+     main = 'GOOG with Sentiments(Sum) - Supervisor = difference between highest and lowest prices')
+axis(1, labels = names(resultsTestSentiSum_GoogHL), 
+     at = 1:ncol(resultsTestSentiSum_GoogHL), las = 3)
 
 #Y2
-resultsTest_GoogSR  = data.frame(
-  YhatGlmnet = c(predict(glmnetOutGoogSR, XtestMat_googSR,
-                         s = elasticOutGoogSR$bestTune$lambda)),
-  YhatMARS   = c(predict(marsOutGoogSR, XtestMat_googSR)),
-  YhatTrees  = predict(rpartOut_GoogSR, XtestMat_googSR),
-  YhatRF     = predict(rfOut_googSR, XtestMat_googSR),
-  YhatBoost  = predict(boostOutRandom_GoogSR, XtestMat_googSR)
+set.seed(2020)
+resultsTestSentiSum_GoogSR  = data.frame(
+  YhatGlmnet_SentiSum = c(predict(glmnetOutGoogSR_SentiSum, XtestMatSentiSum_googSR,
+                         s = elasticOutGoogSR_SentiSum$bestTune$lambda)),
+  YhatMARS_SentiSum   = c(predict(marsOutGoogSR_SentiSum, XtestMatSentiSum_googSR)),
+  YhatTrees_SentiSum  = predict(rpartOutSentiSum_GoogSR, XtestMatSentiSum_googSR),
+  YhatRF_SentiSum     = predict(rfOutSentiSum_googSR, XtestMatSentiSum_googSR),
+  YhatBoost_SentiSum  = predict(boostOutRandomSentiSum_GoogSR, XtestMatSentiSum_googSR)
 )
 
-par(mar=c(7,5,4,2))
-plot(1:length(resultsTest_GoogSR), 
-     sapply(resultsTest_GoogSR, function(Yhat){mean((Yhat - Ytest_googSR)^2)}),
+par(mar=c(10,5,4,2))
+plot(1:length(resultsTestSentiSum_GoogSR), 
+     sapply(resultsTestSentiSum_GoogSR, function(Yhat){mean((Yhat - Ytest_googSR)^2)}),
      xlab = '', xaxt = 'n', pch = 16, ylab = 'test error', 
-     main = 'GOOG - Supervisor = stock return')
-axis(1, labels = names(resultsTest_GoogSR), at = 1:ncol(resultsTest_GoogSR), las = 3)
+     main = 'GOOG with Sentiments(Sum)- Supervisor = stock return')
+axis(1, labels = names(resultsTestSentiSum_GoogSR), at = 1:ncol(resultsTestSentiSum_GoogSR), las = 3)
 
 
 
@@ -3105,102 +3151,125 @@ axis(1, labels = names(resultsTest_GoogSR), at = 1:ncol(resultsTest_GoogSR), las
 ###################Classification
 ####TSLA
 #TSLA MARS(FDA)- Y3
-YhatTestFDA_TslaSRdummyProb = predict(marsOutTslaSRdummy, Xtest_tslaSRdummy,
-                                  type = 'prob')
-YhatTestFDA_TslaSRdummy     = ifelse(YhatTestFDA_TslaSRdummyProb[,2] > 0.5, '1','0')
+YhatTestFDASentiSum_TslaSRdummyProb = predict(marsOutTslaSRdummy_SentiSum,
+                                              XtestSentiSum_tslaSRdummy,
+                                              type = 'prob')
+YhatTestFDASentiSum_TslaSRdummy     = ifelse(YhatTestFDASentiSum_TslaSRdummyProb[,2] > 0.5, '1','0')
 
-table(YhatTestFDA_TslaSRdummy, Ytest_tslaSRdummy)
-(TslaSRdummy_accuracyFDA = sum(diag(table(YhatTestFDA_TslaSRdummy, Ytest_tslaSRdummy)))/length(Ytest_tslaSRdummy))
+table(YhatTestFDASentiSum_TslaSRdummy, Ytest_tslaSRdummy)
+(TslaSRdummySentiSum_accuracyFDA = sum(diag(table(YhatTestFDASentiSum_TslaSRdummy, Ytest_tslaSRdummy)))/length(Ytest_tslaSRdummy))
 
 #TSLA Classification Tree - Y3
-YhatTestTree_TslaSRdummyProb = predict(rpartOut_TslaSRdummy, Xtest_tslaSRdummy,
-                                  type = 'prob')
-YhatTestTree_TslaSRdummy     = ifelse(YhatTestTree_TslaSRdummyProb[,2] > 0.5, '1','0')
-table(YhatTestTree_TslaSRdummy, Ytest_tslaSRdummy)
-(TslaSRdummy_accuracyTree = sum(diag(table(YhatTestTree_TslaSRdummy, Ytest_tslaSRdummy)))/length(Ytest_tslaSRdummy))
+YhatTestTreeSentiSum_TslaSRdummyProb = predict(rpartOutSentiSum_TslaSRdummy,
+                                               XtestSentiSum_tslaSRdummy,
+                                               type = 'prob')
+YhatTestTreeSentiSum_TslaSRdummy     = ifelse(YhatTestTreeSentiSum_TslaSRdummyProb[,2] > 0.5, '1','0')
+table(YhatTestTreeSentiSum_TslaSRdummy, Ytest_tslaSRdummy)
+(TslaSRdummySentiSum_accuracyTree = sum(diag(table(YhatTestTreeSentiSum_TslaSRdummy, Ytest_tslaSRdummy)))/length(Ytest_tslaSRdummy))
 
 #TSLA Random Forest - Y3
 
-YhatTestRF_TslaSRdummyRaw = predict(rfOut_tslaSRdummy, XtestMat_tslaSRdummy,
-                                  type = 'raw')
-YhatTestRF_TslaSRdummy     = ifelse(YhatTestRF_TslaSRdummyRaw == "Yes", '1','0')
+YhatTestRFSentiSum_TslaSRdummyRaw = predict(rfOutSentiSum_tslaSRdummy,
+                                            XtestMatSentiSum_tslaSRdummy,
+                                            type = 'raw')
+YhatTestRFSentiSum_TslaSRdummy     = ifelse(YhatTestRFSentiSum_TslaSRdummyRaw == "Yes", '1','0')
 
-table(YhatTestRF_TslaSRdummy, Ytest_tslaSRdummy)
-(TslaSRdummy_accuracyRF = sum(diag(table(YhatTestRF_TslaSRdummy, Ytest_tslaSRdummy)))/length(Ytest_tslaSRdummy))
+table(YhatTestRFSentiSum_TslaSRdummy, Ytest_tslaSRdummy)
+(TslaSRdummySentiSum_accuracyRF = sum(diag(table(YhatTestRFSentiSum_TslaSRdummy, Ytest_tslaSRdummy)))/length(Ytest_tslaSRdummy))
 
 #TSLA Boosting - Y3
-YhatTestBoost_TslaSRdummyProb = predict(boostOutRandom_TslaSRdummy,
-                                        XtestMat_tslaSRdummy,type = 'prob')
-YhatTestBoost_TslaSRdummy     = ifelse(YhatTestBoost_TslaSRdummyProb[,2] > 0.5, '1','0')
+YhatTestBoostSentiSum_TslaSRdummyProb = predict(boostOutRandomSentiSum_TslaSRdummy,
+                                        XtestMatSentiSum_tslaSRdummy,type = 'prob')
+YhatTestBoostSentiSum_TslaSRdummy     = ifelse(YhatTestBoostSentiSum_TslaSRdummyProb[,2] > 0.5, '1','0')
 
-table(YhatTestBoost_TslaSRdummy, Ytest_tslaSRdummy)
-(TslaSRdummy_accuracyBoost = sum(diag(table(YhatTestBoost_TslaSRdummy, Ytest_tslaSRdummy)))/length(Ytest_tslaSRdummy))
+table(YhatTestBoostSentiSum_TslaSRdummy, Ytest_tslaSRdummy)
+(TslaSRdummySentiSum_accuracyBoost = sum(diag(table(YhatTestBoostSentiSum_TslaSRdummy, Ytest_tslaSRdummy)))/length(Ytest_tslaSRdummy))
 
 #Summary - TSLA - Classification
-resultsTestClass_Tsla = data.frame(
-  accuracyFDA  = TslaSRdummy_accuracyFDA,
-  accuracyTree = TslaSRdummy_accuracyTree,
-  accuracyRF = TslaSRdummy_accuracyRF,
-  accuracyBoost = TslaSRdummy_accuracyBoost
+resultsTestClassSentiSum_Tsla = data.frame(
+  accuracyFDA_SentiSum  = TslaSRdummySentiSum_accuracyFDA,
+  accuracyTree_SentiSum = TslaSRdummySentiSum_accuracyTree,
+  accuracyRF_SentiSum = TslaSRdummySentiSum_accuracyRF,
+  accuracyBoost_SentiSum = TslaSRdummySentiSum_accuracyBoost
 )
-par(mar=c(7,5,4,2))
-plot(1:length(resultsTestClass_Tsla), 
-     resultsTestClass_Tsla,
+par(mar=c(11,5,4,2))
+plot(1:length(resultsTestClassSentiSum_Tsla), 
+     resultsTestClassSentiSum_Tsla,
      xlab = '', xaxt = 'n', pch = 16, ylab = 'accuracy', 
-     main = 'TSLA - Supervisor = stock return (dummy)')
-axis(1, labels = names(resultsTestClass_Tsla), at = 1:ncol(resultsTestClass_Tsla), las = 3)
+     main = 'TSLA with Sentiments(Sum) - Supervisor = stock return (dummy)')
+axis(1, labels = names(resultsTestClassSentiSum_Tsla), 
+     at = 1:ncol(resultsTestClassSentiSum_Tsla), las = 3)
 
 
 ####GOOG
 #GOOG MARS(FDA) - Y3
-YhatTestFDA_GoogSRdummyProb = predict(marsOutGoogSRdummy, Xtest_googSRdummy,
-                                  type = 'prob')
+YhatTestFDASentiSum_GoogSRdummyProb = predict(marsOutGoogSRdummy_SentiSum,
+                                              XtestSentiSum_googSRdummy,
+                                              type = 'prob')
 
-YhatTestFDA_GoogSRdummy     = ifelse(YhatTestFDA_GoogSRdummyProb[,2] > 0.5, '1','0')
+YhatTestFDASentiSum_GoogSRdummy     = ifelse(YhatTestFDASentiSum_GoogSRdummyProb[,2] > 0.5, '1','0')
 
-table(YhatTestFDA_GoogSRdummy, Ytest_googSRdummy)
-(GoogSRdummy_accuracyFDA = sum(diag(table(YhatTestFDA_GoogSRdummy, Ytest_googSRdummy)))/length(Ytest_googSRdummy))
+table(YhatTestFDASentiSum_GoogSRdummy, Ytest_googSRdummy)
+(GoogSRdummySentiSum_accuracyFDA = sum(diag(table(YhatTestFDASentiSum_GoogSRdummy, Ytest_googSRdummy)))/length(Ytest_googSRdummy))
 
 #GOOG Classification Tree - Y3
-YhatTestTree_GoogSRdummyProb = predict(rpartOut_GoogSRdummy, Xtest_googSRdummy,
+YhatTestTreeSentiSum_GoogSRdummyProb = predict(rpartOutSentiSum_GoogSRdummy, Xtest_googSRdummy,
                                   type = 'prob')
-YhatTestTree_GoogSRdummy     = ifelse(YhatTestTree_GoogSRdummyProb[,2] > 0.5, '1','0')
-table(YhatTestTree_GoogSRdummy, Ytest_googSRdummy)
-(GoogSRdummy_accuracyTree = sum(diag(table(YhatTestTree_GoogSRdummy, Ytest_googSRdummy)))/length(Ytest_googSRdummy))
+YhatTestTreeSentiSum_GoogSRdummy     = ifelse(YhatTestTreeSentiSum_GoogSRdummyProb[,2] > 0.5, '1','0')
+table(YhatTestTreeSentiSum_GoogSRdummy, Ytest_googSRdummy)
+(GoogSRdummySentiSum_accuracyTree = sum(diag(table(YhatTestTreeSentiSum_GoogSRdummy, Ytest_googSRdummy)))/length(Ytest_googSRdummy))
 
 #GOOG Random Forest - Y3
-YhatTestRF_GoogSRdummyRaw = predict(rfOut_googSRdummy, Xtest_googSRdummy,
-                                  type = 'raw')
+YhatTestRFSentiSum_GoogSRdummyRaw = predict(rfOutSentiSum_googSRdummy,
+                                            XtestSentiSum_googSRdummy,
+                                            type = 'raw')
 
-YhatTestRF_GoogSRdummy     = ifelse(YhatTestRF_GoogSRdummyRaw == "Yes", '1','0')
+YhatTestRFSentiSum_GoogSRdummy     = ifelse(YhatTestRFSentiSum_GoogSRdummyRaw == "Yes", '1','0')
 
-table(YhatTestRF_GoogSRdummy, Ytest_googSRdummy)
-(GoogSRdummy_accuracyRF = sum(diag(table(YhatTestRF_GoogSRdummy, Ytest_googSRdummy)))/length(Ytest_googSRdummy))
+table(YhatTestRFSentiSum_GoogSRdummy, Ytest_googSRdummy)
+(GoogSRdummySentiSum_accuracyRF = sum(diag(table(YhatTestRFSentiSum_GoogSRdummy, Ytest_googSRdummy)))/length(Ytest_googSRdummy))
 
 
 #GOOG Boosting - Y3
-YhatTestBoost_GoogSRdummyProb = predict(boostOutRandom_GoogSRdummy,
-                                        XtestMat_googSRdummy,type = 'prob')
-YhatTestBoost_GoogSRdummy     = ifelse(YhatTestBoost_GoogSRdummyProb[,2] > 0.5, '1','0')
+YhatTestBoostSentiSum_GoogSRdummyProb = predict(boostOutRandomSentiSum_GoogSRdummy,
+                                        XtestMatSentiSum_googSRdummy,type = 'prob')
+YhatTestBoostSentiSum_GoogSRdummy     = ifelse(YhatTestBoostSentiSum_GoogSRdummyProb[,2] > 0.5, '1','0')
 
-table(YhatTestBoost_GoogSRdummy, Ytest_googSRdummy)
-(GoogSRdummy_accuracyBoost = sum(diag(table(YhatTestBoost_GoogSRdummy, Ytest_googSRdummy)))/length(Ytest_googSRdummy))
+table(YhatTestBoostSentiSum_GoogSRdummy, Ytest_googSRdummy)
+(GoogSRdummySentiSum_accuracyBoost = sum(diag(table(YhatTestBoostSentiSum_GoogSRdummy, Ytest_googSRdummy)))/length(Ytest_googSRdummy))
 
 
 #Summary - GOOG - Classification
-resultsTestClass_Goog = data.frame(
-  accuracyFDA   = GoogSRdummy_accuracyFDA,
-  accuracyTree  = GoogSRdummy_accuracyTree,
-  accuracyRF    = GoogSRdummy_accuracyRF,
-  accuracyBoost = GoogSRdummy_accuracyBoost
+resultsTestClassSentiSum_Goog = data.frame(
+  accuracyFDA_SentiSum   = GoogSRdummySentiSum_accuracyFDA,
+  accuracyTree_SentiSum  = GoogSRdummySentiSum_accuracyTree,
+  accuracyRF_SentiSum    = GoogSRdummySentiSum_accuracyRF,
+  accuracyBoost_SentiSum = GoogSRdummySentiSum_accuracyBoost
 )
 
-par(mar=c(7,5,4,2))
-plot(1:length(resultsTestClass_Goog), 
-     resultsTestClass_Goog,
+par(mar=c(10,5,4,2))
+plot(1:length(resultsTestClassSentiSum_Goog), 
+     resultsTestClassSentiSum_Goog,
      xlab = '', xaxt = 'n', pch = 16,  ylab = 'accuracy', 
-     main = 'GOOG - Supervisor = stock return (dummy)')
-axis(1, labels = names(resultsTestClass_Goog), at = 1:ncol(resultsTestClass_Goog), las = 3)
+     main = 'GOOG with Sentiments(Sum) - Supervisor = stock return (dummy)')
+axis(1, labels = names(resultsTestClassSentiSum_Goog), 
+     at = 1:ncol(resultsTestClassSentiSum_Goog), las = 3)
+```
+
+```{r FinalPerformanceReview}
+
+
+
+colVec = rainbow(3)
+par(mar = c(7,5,4,2))
+plot(1:ncol(resultsTestClassSentiSum_Goog), resultsTestClassSentiSum_Goog, col = colVec[1], 
+     pch = 15, ylim = c(0,1), ylab = "GOOG - Supervisor = stock return (dummy)", xlab = " " )
+points(1:ncol(resultsTestClass_Goog),  resultsTestClass_Goog,  col = colVec[2], pch = 16)
+
+axis(1, labels = names(resultsTestClass_Goog), at = 1:ncol(resultsTestClass_Goog), 
+     las = 3)
+legend('topright', col = colVec, pch = c(15:21), 
+       legend = c('with Sentiments(Sum)','without Sentiments'))
 
 ```
 
@@ -3208,6 +3277,1136 @@ axis(1, labels = names(resultsTestClass_Goog), at = 1:ncol(resultsTestClass_Goog
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+###### 9 - Final Task with sentiments Mean
+
+
+```{r dataSplitFinalTaskMean}
+#Line 990
+#Superviors:
+  #Y1: YtslaWithSentiments$diffHighLowTomorrow
+  #Y2: YtslaWithSentiments$stockReturnTomorrow
+  #Y3: YtslaWithSentiments$stockReturnTomorrowDummy
+
+#Features wtiht Sentiments:
+XtslaWithSentimentsMean = XtslaWithSentiments %>%
+  select(-tslaSentimentsSum)
+XgoogWithSentimentsMean = XgoogWithSentiments %>%
+  select(-googSentimentsSum)
+
+
+#Data Split
+##TSLA
+
+#set.seed(2020)
+#inTrain_tslaHL = caret::createDataPartition(YtslaWithSentiments$diffHighLowTomorrow, p = 4/5, list = FALSE) #Y1
+#inTrain_tslaSR = caret::createDataPartition(YtslaWithSentiments$stockReturnTomorrow, p = 4/5, list = FALSE) #Y2
+#inTrain_tslaSRdummy = caret::createDataPartition(YtslaWithSentiments$stockReturnTomorrowDummy, p = 4/5, list = FALSE) #Y3
+
+
+Ytrain_tslaHL = YtslaWithSentiments$diffHighLowTomorrow[inTrain_tslaHL]
+Ytest_tslaHL  = YtslaWithSentiments$diffHighLowTomorrow[-inTrain_tslaHL]
+Ytrain_tslaSR = YtslaWithSentiments$stockReturnTomorrow[inTrain_tslaSR]
+Ytest_tslaSR  = YtslaWithSentiments$stockReturnTomorrow[-inTrain_tslaSR]
+Ytrain_tslaSRdummy = YtslaWithSentiments$stockReturnTomorrowDummy[inTrain_tslaSRdummy]
+Ytest_tslaSRdummy  = YtslaWithSentiments$stockReturnTomorrowDummy[-inTrain_tslaSRdummy]
+
+
+XtrainSentiMean_tslaHL = XtslaWithSentimentsMean[inTrain_tslaHL,] 
+XtestSentiMean_tslaHL  = XtslaWithSentimentsMean[-inTrain_tslaHL,]
+XtrainSentiMean_tslaSR = XtslaWithSentimentsMean[inTrain_tslaSR,] 
+XtestSentiMean_tslaSR  = XtslaWithSentimentsMean[-inTrain_tslaSR,]
+XtrainSentiMean_tslaSRdummy = XtslaWithSentimentsMean[inTrain_tslaSRdummy,]
+XtestSentiMean_tslaSRdummy  = XtslaWithSentimentsMean[-inTrain_tslaSRdummy,]
+
+###GOOG
+
+#set.seed(2020)
+#inTrain_googHL = caret::createDataPartition(YgoogWithSentiments$diffHighLowTomorrow, p = 4/5, list = FALSE) #Y1
+#inTrain_googSR = caret::createDataPartition(YgoogWithSentiments$stockReturnTomorrow, p = 4/5, list = FALSE) #Y2
+#inTrain_googSRdummy = caret::createDataPartition(YgoogWithSentiments$stockReturnTomorrowDummy, p = 4/5, list = FALSE) #Y3
+
+
+Ytrain_googHL = YgoogWithSentiments$diffHighLowTomorrow[inTrain_googHL]
+Ytest_googHL  = YgoogWithSentiments$diffHighLowTomorrow[-inTrain_googHL]
+Ytrain_googSR = YgoogWithSentiments$stockReturnTomorrow[inTrain_googSR]
+Ytest_googSR  = YgoogWithSentiments$stockReturnTomorrow[-inTrain_googSR]
+Ytrain_googSRdummy = YgoogWithSentiments$stockReturnTomorrowDummy[inTrain_googSRdummy]
+Ytest_googSRdummy  = YgoogWithSentiments$stockReturnTomorrowDummy[-inTrain_googSRdummy]
+
+
+XtrainSentiMean_googHL = XgoogWithSentimentsMean[inTrain_googHL,]
+XtestSentiMean_googHL  = XgoogWithSentimentsMean[-inTrain_googHL,]
+XtrainSentiMean_googSR = XgoogWithSentimentsMean[inTrain_googSR,]
+XtestSentiMean_googSR  = XgoogWithSentimentsMean[-inTrain_googSR,]
+XtrainSentiMean_googSRdummy = XgoogWithSentimentsMean[inTrain_googSRdummy,]
+XtestSentiMean_googSRdummy  =XgoogWithSentimentsMean[-inTrain_googSRdummy,]
+
+```
+
+
+```{r setupFinalTaskMean}
+
+#Repeated cross validation
+trControl = caret::trainControl(method = "repeatedcv", repeats = 5, number = 10)
+
+XtrainMatSentiMean_tslaHL      = as.matrix(XtrainSentiMean_tslaHL)
+XtestMatSentiMean_tslaHL       = as.matrix(XtestSentiMean_tslaHL)
+XtrainMatSentiMean_tslaSR      = as.matrix(XtrainSentiMean_tslaSR)
+XtestMatSentiMean_tslaSR       = as.matrix(XtestSentiMean_tslaSR)
+XtrainMatSentiMean_tslaSRdummy = as.matrix(XtrainSentiMean_tslaSRdummy)
+XtestMatSentiMean_tslaSRdummy  = as.matrix(XtestSentiMean_tslaSRdummy)
+
+####GOOG
+#Feature transformations
+XtrainMatSentiMean_googHL      = as.matrix(XtrainSentiMean_googHL)
+XtestMatSentiMean_googHL       = as.matrix(XtestSentiMean_googHL)
+XtrainMatSentiMean_googSR      = as.matrix(XtrainSentiMean_googSR)
+XtestMatSentiMean_googSR       = as.matrix(XtestSentiMean_googSR)
+XtrainMatSentiMean_googSRdummy = as.matrix(XtrainSentiMean_googSRdummy)
+XtestMatSentiMean_googSRdummy  = as.matrix(XtestSentiMean_googSRdummy)
+
+#Parallelism
+#cl = parallel::makeCluster(8)
+#doParallel::registerDoParallel(cl)
+```
+
+
+```{r elasticNetTuningParameters}
+set.seed(2020)
+cl = parallel::makeCluster(8)
+doParallel::registerDoParallel(cl)
+####Supervisor Y1 = YtslaWithSentiments$diffHighLowTomorrow
+####TSLA
+trControl = caret::trainControl(method = "repeatedcv", repeats = 5, number = 10)
+
+lassoGridTslaHL_SentiMean = expand.grid(lambda = c(0.0001,0.001, 0.01, 0.05, 0.1, 0.2),
+                            alpha = c(0.05,0.5,1))
+
+
+elasticOutTslaHL_SentiMean = train(x = XtrainMatSentiMean_tslaHL, y = Ytrain_tslaHL, 
+                       method = 'glmnet',
+                       tuneGrid = lassoGridTslaHL_SentiMean, 
+                       trControl = trControl)
+plot(elasticOutTslaHL_SentiMean, main = "Elastic Net - TSLA diffHighLow with Sentiments(Mean)")
+
+####GOOG
+#trControl = caret::trainControl(method = "repeatedcv", repeats = 2, number = 10)
+
+lassoGridGoogHL_SentiMean = expand.grid(lambda = c(0.0001,0.001, 0.01, 0.05, 0.1, 0.2),
+                            alpha = c(0.05,0.5,1))
+
+
+elasticOutGoogHL_SentiMean = train(x = XtrainMatSentiMean_googHL, y = Ytrain_googHL, 
+                       method = 'glmnet',
+                       tuneGrid = lassoGridGoogHL_SentiMean, 
+                       trControl = trControl)
+plot(elasticOutGoogHL_SentiMean, main = "Elastic Net - GOOG diffHighLow with Sentiments(Mean)")
+
+
+
+####Supervisor Y2 = YtslaWithSentiments$stockReturnTomorrow
+####TSLA
+#trControl = caret::trainControl(method = "repeatedcv", repeats = 2, number = 10)
+
+lassoGridTslaSR_SentiMean = expand.grid(lambda = c(0.0001,0.001, 0.01, 0.05, 0.1, 0.2),
+                            alpha = c(0.05,0.5,1))
+
+
+elasticOutTslaSR_SentiMean = train(x = XtrainMatSentiMean_tslaSR, y = Ytrain_tslaSR, 
+                       method = 'glmnet',
+                       tuneGrid = lassoGridTslaSR_SentiMean, 
+                       trControl = trControl)
+plot(elasticOutTslaSR_SentiMean, main = "Elastic Net - TSLA stockReturn with Sentiments(Mean)")
+
+####GOOG
+#trControl = caret::trainControl(method = "repeatedcv", repeats = 2, number = 10)
+
+lassoGridGoogSR_SentiMean = expand.grid(lambda = c(0.0001,0.001, 0.01, 0.05, 0.1, 0.2),
+                            alpha = c(0.05,0.5,1))
+
+
+elasticOutGoogSR_SentiMean = train(x = XtrainMatSentiMean_googSR, y = Ytrain_googSR, 
+                       method = 'glmnet',
+                       tuneGrid = lassoGridGoogSR_SentiMean, 
+                       trControl = trControl)
+plot(elasticOutGoogSR_SentiMean, main = "Elastic Net - GOOG stockReturn with Sentiments(Mean)")
+
+
+#List of turning parameters
+tunePara = rbind(
+  elasticOutTslaHL_SentiMean$bestTune,
+  elasticOutTslaSR_SentiMean$bestTune,
+  elasticOutGoogHL_SentiMean$bestTune,
+  elasticOutGoogSR_SentiMean$bestTune
+  )
+
+row.names(tunePara) = c("TSLA - diffHighLow", "TSLA - stockReturn",
+                "GOOG - diffHighLow", "GOOG - stockReturn")
+
+knitr::kable(
+ tunePara,
+ col.names = c("alpha","lambda"),
+ caption   = "Table 1: Optimal tuning parameters for Elastic Penalized  regression with Sentiments Mean",
+ align     = "lccrr"
+)
+
+```
+
+
+```{r elasticNet}
+####Supervisor Y1 = YtslaStandardizedWithDummy$diffHighLowTomorrow
+####TSLA
+glmnetOutTslaHL_SentiMean       = glmnet(x = XtrainMatSentiMean_tslaHL, y = Ytrain_tslaHL, 
+                               alpha = elasticOutTslaHL_SentiMean$bestTune$alpha)
+betaHatGlmnetTslaHL_SentiMean   = coef(glmnetOutTslaHL_SentiMean, 
+                             s = elasticOutTslaHL_SentiMean$bestTune$lambda)
+YhatTrainGlmnetTslaHL_SentiMean = predict(glmnetOutTslaHL_SentiMean, XtrainMatSentiMean_tslaHL, 
+                                s = elasticOutTslaHL_SentiMean$bestTune$lambda)
+
+residualsTslaHL_SentiMean = Ytrain_tslaHL - YhatTrainGlmnetTslaHL_SentiMean
+plot(YhatTrainGlmnetTslaHL_SentiMean, residualsTslaHL_SentiMean, 
+     xlab = "Traning predictions - TSLA diffHighLow",
+     ylab = "Residuals", main = "Residual Plot - TSLA diffHighLow with Sentiments(Mean)")
+
+####GOOG
+
+glmnetOutGoogHL_SentiMean       = glmnet(x = XtrainMatSentiMean_googHL, y = Ytrain_googHL, 
+                               alpha = elasticOutGoogHL_SentiMean$bestTune$alpha)
+betaHatGlmnetGoogHL_SentiMean   = coef(glmnetOutGoogHL_SentiMean, 
+                             s = elasticOutGoogHL_SentiMean$bestTune$lambda)
+YhatTrainGlmnetGoogHL_SentiMean = predict(glmnetOutGoogHL_SentiMean, XtrainMatSentiMean_googHL, 
+                                s = elasticOutGoogHL_SentiMean$bestTune$lambda )
+
+residualsGoogHL_SentiMean = Ytrain_googHL - YhatTrainGlmnetGoogHL_SentiMean
+plot(YhatTrainGlmnetGoogHL_SentiMean, residualsGoogHL_SentiMean, 
+     xlab = "Traning predictions - GOOG diffHighLow",
+     ylab = "Residuals", main = "Residual Plot - GOOG diffHighLow with Sentiments(Mean)")
+
+####Supervisor Y2 = YtslaStandardizedWithDummy$stockReturnTomorrow
+####TSLA
+glmnetOutTslaSR_SentiMean       = glmnet(x = XtrainMatSentiMean_tslaSR, y = Ytrain_tslaSR, 
+                               alpha = elasticOutTslaSR_SentiMean$bestTune$alpha)
+betaHatGlmnetTslaSR_SentiMean   = coef(glmnetOutTslaSR_SentiMean, 
+                             s = elasticOutTslaSR_SentiMean$bestTune$lambda)
+YhatTrainGlmnetTslaSR_SentiMean = predict(glmnetOutTslaSR_SentiMean, XtrainMatSentiMean_tslaSR, 
+                                s = elasticOutTslaSR_SentiMean$bestTune$lambda)
+
+residualsTslaSR_SentiMean = Ytrain_tslaSR - YhatTrainGlmnetTslaSR_SentiMean
+plot(YhatTrainGlmnetTslaSR_SentiMean, residualsTslaSR_SentiMean, 
+     xlab = "Traning predictions - TSLA Stock Return",
+     ylab = "Residuals", main = "Residual Plot - TSLA stockReturn with Sentiments(Mean)")
+
+####GOOG
+glmnetOutGoogSR_SentiMean       = glmnet(x = XtrainMatSentiMean_googSR, y = Ytrain_googSR,
+                               alpha = elasticOutGoogSR_SentiMean$bestTune$alpha)
+betaHatGlmnetGoogSR_SentiMean   = coef(glmnetOutGoogSR_SentiMean, 
+                             s = elasticOutGoogSR_SentiMean$bestTune$lambda)
+YhatTrainGlmnetGoogSR_SentiMean = predict(glmnetOutGoogSR_SentiMean, XtrainMatSentiMean_googSR, 
+                                s = elasticOutGoogSR_SentiMean$bestTune$lambda)
+
+residualsGoogSR_SentiMean = Ytrain_googSR - YhatTrainGlmnetGoogSR
+plot(YhatTrainGlmnetGoogSR, residualsGoogSR_SentiMean, 
+     xlab = "Traning predictions - GOOG Stock Return",
+     ylab = "Residuals", main = "Residual Plot - GOOG stockReturn with Sentiments(Mean)")
+
+```
+
+####Logistic Classification
+```{r logisticClassificationMean}
+set.seed(2020)
+trControl = caret::trainControl(method = "repeatedcv", repeats = 5, number = 10)
+tuneGridTslaSRdummy = expand.grid('alpha' = c(0,.25,.5,.75,1),
+                                  'lambda' = seq(0.000001, .001, length.out = 30))
+elasticOutTslaSRdummy_SentiMean = train(x = XtrainSentiMean_tslaSRdummy, 
+                              y = as.factor(Ytrain_tslaSRdummy_),
+                              method = 'glmnet',
+                              trControl = trControl, 
+                              tuneGrid = tuneGridTslaSRdummy)
+
+glmnetOutTslaSRdummy_SentiMean = glmnet(x = XtrainMatSentiMean_tslaSRdummy, 
+                              y = as.factor(Ytrain_tslaSRdummy_),
+                              alpha = 0.25,
+                              family = 'binomial')
+probHatTestSentiMean_TslaSRdummy = predict(glmnetOutTslaSRdummy_SentiMean,
+                                  XtestMatSentiMean_tslaSRdummy,
+                                  s = elasticOutTslaSRdummy_SentiMean$bestTune$lambda,
+                                  type = 'response')
+
+YhatTestGlmnetSentiMean_TslaSRdummy = ifelse(probHatTestSentiMean_TslaSRdummy > 0.5, '1', '0')
+YhatTestSentiMean_TslaSRdummy       = predict(elasticOutTslaSRdummy_SentiMean,
+                                             XtestMatSentiMean_tslaSRdummy,
+                                     s = elasticOutTslaSRdummy_SentiMean$lambda, 
+                                     type = 'raw')
+
+#Cross-check they're the same. #Lecture 23 notes.
+table(YhatTestSentiMean_TslaSRdummy,YhatTestSentiMean_TslaSRdummy)
+
+
+betaHatGlmnetTslaSRdummy_SentiMean = coef(glmnetOutTslaSRdummy_SentiMean, 
+                                s = elasticOutTslaSRdummy_SentiMean$bestTune$lambda)
+#Accuracy
+accuracyLinearSentiMean_TslaSRdummy = mean(YhatTestSentiMean_TslaSRdummy==Ytest_tslaSRdummy)
+
+probHatTestSentiMean_TslaSRdummy_ = predict(elasticOutTslaSRdummy_SentiMean,
+                                           XtestMatSentiMean_tslaSRdummy,
+                                   s = elasticOutTslaSRdummy_SentiMean$bestTune$lambda,
+                                   type = 'prob')
+rocOutSentiMean_TslaSRdummy = pROC::roc(response = Ytest_tslaSRdummy,                   
+                               probHatTestSentiMean_TslaSRdummy_[,2])
+
+plot(rocOutSentiMean_TslaSRdummy, main = "ROC Plot - TSLA Stock Return (Dummy) with Sentiments(Mean)")
+
+
+
+
+
+
+####GOOG
+set.seed(2020)
+
+tuneGridGoogSRdummy = expand.grid('alpha' = c(0,.25,.5,.75,1),
+                                  'lambda' = seq(0.000001, .001, length.out = 30))
+elasticOutGoogSRdummy_SentiMean = train(x = XtrainSentiMean_googSRdummy, 
+                              y = as.factor(Ytrain_googSRdummy),
+                              method = 'glmnet',
+                              trControl = trControl, 
+                              tuneGrid = tuneGridGoogSRdummy)
+
+
+glmnetOutGoogSRdummy_SentiMean = glmnet(x = XtrainMatSentiMean_googSRdummy, 
+                              y = as.factor(Ytrain_googSRdummy),
+                              alpha = 0.25,
+                              family = 'binomial')
+probHatTestSentiMean_GoogSRdummy = predict(glmnetOutGoogSRdummy_SentiMean,
+                                           XtestMatSentiMean_googSRdummy,
+                                  s = elasticOutGoogSRdummy_SentiMean$bestTune$lambda,
+                                  type = 'response')
+
+YhatTestGlmnetSentiMean_GoogSRdummy = ifelse(probHatTestSentiMean_GoogSRdummy > 0.5,
+                                             '1', '0')
+YhatTestSentiMean_GoogSRdummy       = predict(elasticOutGoogSRdummy_SentiMean,
+                                             XtestMatSentiMean_googSRdummy,
+                                     s = elasticOutGoogSRdummy_SentiMean$lambda, 
+                                     type = 'raw')
+
+#Cross-check they're the same. #Lecture 23 notes.
+table(YhatTestSentiMean_GoogSRdummy,YhatTestSentiMean_GoogSRdummy)
+
+betaHatGlmnetGoogSRdummy_SentiMean = coef(glmnetOutGoogSRdummy_SentiMean, 
+                                s = elasticOutGoogSRdummy_SentiMean$bestTune$lambda)
+#Accuracy
+accuracyLinearSentiMean_GoogSRdummy = mean(YhatTestSentiMean_GoogSRdummy==Ytest_googSRdummy)
+probHatTestSentiMean_GoogSRdummy_ = predict(elasticOutGoogSRdummy_SentiMean,
+                                           XtestMatSentiMean_googSRdummy,
+                                   s = elasticOutGoogSRdummy_SentiMean$bestTune$lambda,
+                                   type = 'prob')
+rocOutSentiMean_GoogSRdummy = pROC::roc(response = Ytest_googSRdummy,                   
+                                       probHatTestSentiMean_GoogSRdummy_[,2])
+
+plot(rocOutSentiMean_GoogSRdummy, 
+     main = "ROC Plot - GOOG Stock Return (Dummy) with Sentiments(Mean)")
+
+
+
+#List of Accuracy
+accuracyLinearSentiMean = rbind(
+  accuracyLinearSentiMean_TslaSRdummy,
+  accuracyLinearSentiMean_GoogSRdummy
+  )
+
+row.names(accuracyLinearSentiMean) = c("TSLA - Stock Return(dummy)", 
+                "GOOG - Stock Return(dummy)")
+
+knitr::kable(
+ accuracyLinearSentiMean,
+ col.names = c("Accuracy based on Testing data"),
+ caption   = "Table 2: Accuracy - Logistic Elastic Net with Sentiments(Mean)",
+ align     = "lccrr"
+)
+
+```
+
+####Nonlinear Methods
+
+####MARS
+```{r MARS_Mean}
+set.seed(2020)
+cl = parallel::makeCluster(8)
+doParallel::registerDoParallel(cl)
+trControl = caret::trainControl(method = "repeatedcv", repeats = 5, number = 10)
+
+###TSLA
+#Y1
+tuneGridTslaHL      = expand.grid(degree = 1:3,
+                                  nprune = 10:35)
+marsOutTslaHL_SentiMean = train(x = XtrainMatSentiMean_tslaHL, y = Ytrain_tslaHL,
+                      method = 'earth', metric = 'RMSE',
+                      tuneGrid = tuneGridTslaHL,
+                      trControl = trControl)
+
+#plot(marsOutTslaHL_SentiMean, 
+#     main = "MARS Regression - TSLA diffHighLow with Sentiments(Mean)")
+#ggplot(marsOutTslaHL_SentiMean)+labs( title= "MARS Regression - TSLA diffHighLow")
+
+
+#Y2
+tuneGridTslaSR      = expand.grid(degree = 1:3,
+                                  nprune = 10:35)
+marsOutTslaSR_SentiMean = train(x = XtrainMatSentiMean_tslaSR, y = Ytrain_tslaSR,
+                      method = 'earth', metric = 'RMSE',
+                      tuneGrid = tuneGridTslaSR,
+                      trControl = trControl)
+
+#plot(marsOutTslaSR_SentiMean, 
+#     main = "MARS Regression - TSLA stockReturn with Sentiments(Mean)")
+
+
+#Y3
+tuneGridTslaSRdummy = expand.grid(degree = 1:3,
+                                  nprune = c(10,20,50,100))
+
+trControl_tslaSRdummy = caret::trainControl(method = "repeatedcv", repeats = 2, 
+                                 number = 10, classProbs = TRUE)
+
+Ytrain_tslaSRdummy_ = as.factor(Ytrain_tslaSRdummy[Ytrain_tslaSRdummy == '1'|
+                                                   Ytrain_tslaSRdummy == '0'])
+Ytrain_tslaSRdummy_ = relevel(Ytrain_tslaSRdummy_, ref = '0')
+levels(Ytrain_tslaSRdummy_) = c("No", "Yes")
+
+
+library(mda)
+set.seed(888)
+marsOutTslaSRdummy_SentiMean = train(x = XtrainMatSentiMean_tslaSRdummy, 
+                           y = Ytrain_tslaSRdummy_,
+                      method = 'fda',
+                      metric = 'Accuracy',
+                      tuneGrid = tuneGridTslaSRdummy,
+                      trControl = trainControl(method = "CV",  
+                                               number = 2, classProbs = TRUE))
+
+#plot(marsOutTslaSRdummy,
+#     main = "MARS Regression - TSLA stockReturnDummy with Sentiments(Mean)")
+
+
+
+###GOOG
+#Y1
+tuneGridGoogHL      = expand.grid(degree = 1:3,
+                                  nprune = 10:35)
+marsOutGoogHL_SentiMean = train(x = XtrainMatSentiMean_googHL, y = Ytrain_googHL,
+                      method = 'earth', metric = 'RMSE',
+                      tuneGrid = tuneGridGoogHL,
+                      trControl = trControl)
+
+#ggplot(marsOutGoogHL_SentiMean)+labs(title= "MARS Regression - GOOG diffHighLow with Sentiments(Mean)")
+
+#Meanmary(marsOutGoogHL) %>% .$coefficients %>% head(10)
+
+
+#Y2
+tuneGridGoogSR      = expand.grid(degree = 1:3,
+                                  nprune = 10:35)
+marsOutGoogSR_SentiMean = train(x = XtrainMatSentiMean_googSR, y = Ytrain_googSR,
+                      method = 'earth', metric = 'RMSE',
+                      tuneGrid = tuneGridGoogSR,
+                      trControl = trControl)
+
+#plot(marsOutGoogSR_SentiMean, 
+#     main = "MARS Regression - GOOG stockReturn with Sentiments(Mean)")
+#Y3
+tuneGridGoogSRdummy = expand.grid(degree = 1:3,
+                                  nprune = c(10,20,50,100))
+trControl_googSRdummy = caret::trainControl(method = "repeatedcv", repeats = 2, 
+                                number = 10, classProbs = TRUE)
+Ytrain_googSRdummy_ = as.factor(Ytrain_googSRdummy[Ytrain_googSRdummy == '1'|
+                                                   Ytrain_googSRdummy == '0'])
+Ytrain_googSRdummy_ = relevel(Ytrain_googSRdummy_, ref = '0')
+
+
+levels(Ytrain_googSRdummy_) = c("No", "Yes")
+library(mda)
+set.seed(888)
+marsOutGoogSRdummy_SentiMean = train(x = XtrainMatSentiMean_googSRdummy, 
+                           y = Ytrain_googSRdummy_,
+                      method = 'fda',
+                      metric = 'Accuracy',
+                      tuneGrid = tuneGridGoogSRdummy,
+                      trControl = trControl_googSRdummy)
+
+
+
+###Meanmary
+ggplot(marsOutTslaHL_SentiMean)+labs( title= "MARS Regression - TSLA diffHighLow with Sentiments(Mean)")
+ggplot(marsOutTslaSR_SentiMean)+labs( title= "MARS Regression - TSLA stockReturn with Sentiments(Mean)")
+ggplot(marsOutTslaSRdummy_SentiMean)+labs(title= "MARS Classification - TSLA stockReturn(dummy) with Sentiments(Mean)")
+ggplot(marsOutGoogHL_SentiMean)+labs( title= "MARS Regression - GOOG diffHighLow with Sentiments(Mean)")
+ggplot(marsOutGoogSR_SentiMean)+labs( title= "MARS Regression - GOOG stockReturn with Sentiments(Mean)")
+ggplot(marsOutGoogSRdummy_SentiMean)+labs(title= "MARS Classification - GOOG stockReturn(dummy) with Sentiments(Mean)")
+
+#List of Tuning Parameters
+tuneParaMars_SentiMean = rbind(
+  marsOutTslaHL_SentiMean$bestTune,
+  marsOutTslaSR_SentiMean$bestTune,
+  marsOutTslaSRdummy_SentiMean$bestTune,
+  marsOutGoogHL_SentiMean$bestTune,
+  marsOutGoogSR_SentiMean$bestTune,
+  marsOutGoogSRdummy_SentiMean$bestTune
+  )
+
+
+row.names(tuneParaMars_SentiMean) = c("TSLA - diffHighLow", "TSLA - stockReturn", 
+                            "TSLA - stockReturn(Dummy)","GOOG - diffHighLow", 
+                            "GOOG - stockReturn","GOOG - stockReturn(Dummy)")
+
+knitr::kable(
+ tuneParaMars_SentiMean,
+ col.names = c("nprune", "degree"),
+ caption   = "Table 3: MARS regression and Classification - Tuning Parameters ( with Sentiments(Mean))",
+ align     = "lccrr"
+)
+
+#Importance
+
+marsTslaHLvip_SentiMean = vip(marsOutTslaHL_SentiMean, num_features = 50, 
+                             bar = FALSE, value = "gcv") +
+  ggtitle("Plot of Variable Importance with Sentiments(Mean): TSLA - diffHighLow")
+plot(marsTslaHLvip_SentiMean)
+
+marsTslaSRvip_SentiMean = vip(marsOutTslaSR_SentiMean, num_features = 50, 
+                             bar = FALSE, value = "gcv") +
+  ggtitle("Plot of Variable Importance with Sentiments(Mean): TSLA - stockReturn")
+plot(marsTslaSRvip_SentiMean)
+
+marsTslaSRdummyvip_SentiMean = vip(marsOutTslaSRdummy_SentiMean, num_features = 50, 
+                                  bar = FALSE, value = "gcv") + ggtitle("Plot of Variable Importance with Sentiments(Mean): TSLA - stockReturn(dummy)")
+plot(marsTslaSRdummyvip_SentiMean)
+
+
+marsGoogHLvip_SentiMean = vip(marsOutGoogHL_SentiMean, num_features = 50, 
+                             bar = FALSE, value = "gcv") +
+  ggtitle("Plot of Variable Importance with Sentiments(Mean): GOOG - diffHighLow")
+plot(marsGoogHLvip_SentiMean)
+
+marsGoogSRvip_SentiMean = vip(marsOutGoogSR_SentiMean, num_features = 50, 
+                             bar = FALSE, value = "gcv") +
+  ggtitle("Plot of Variable Importance with Sentiments(Mean): GOOG - stockReturn")
+plot(marsGoogSRvip_SentiMean)
+
+marsGoogSRdummyvip_SentiMean = vip(marsOutGoogSRdummy_SentiMean, num_features = 50, 
+                                  bar = FALSE, value = "gcv") + ggtitle("Plot of Variable Importance with Sentiments(Mean): GOOG - stockReturn(dummy)")
+plot(marsGoogSRdummyvip_SentiMean)
+
+
+```
+
+####Classification Tree
+
+```{r classificationTreeMean}
+set.seed(2022)
+cl = parallel::makeCluster(8)
+doParallel::registerDoParallel(cl)
+####TSLA
+#trControl = caret::trainControl(method = "repeatedcv", repeats = 5, 
+#                                number = 10, classProbs = TRUE)
+#Y1
+tuneGridTree_TslaHL = expand.grid(cp = c(0.0001,0.001,0.01,0.1,0.15,0.5,1))
+rpartOutSentiMean_TslaHL     = train(x = XtrainMatSentiMean_tslaHL, y = Ytrain_tslaHL,
+                            method = "rpart",
+                            tuneGrid = tuneGridTree_TslaHL,
+                            trControl = trControl)
+plot(rpartOutSentiMean_TslaHL$finalModel, margin = rep(.1,4),
+     main = "Classification Tree with Sentiments(Mean) - TSLA diffHighLow")
+text(rpartOutSentiMean_TslaHL$finalModel, cex = 0.6, digits = 1)
+
+
+
+#Y2
+tuneGridTree_TslaSR = expand.grid(cp = c(0.0001,0.001,0.01,0.1,0.15,0.5,1))
+rpartOutSentiMean_TslaSR     = train(x = XtrainMatSentiMean_tslaSR, y = Ytrain_tslaSR,
+                            method = "rpart",
+                            tuneGrid = tuneGridTree_TslaSR,
+                            trControl = trControl,
+                            control = rpart.control(minsplit = 1, minbucket = 1))
+rpartOutSentiMean_TslaSR$finalModel #just a root
+#plot(rpartOut_TslaSR$finalModel, margin = rep(.1,4))
+#text(rpartOut_TslaSR$finalModel, cex = 0.6, digits = 1)
+
+
+#Y3
+tuneGridTree_TslaSRdummy = expand.grid(cp = c(0,0.0001,0.001,0.01,0.1,0.15,0.5,1))
+rpartOutSentiMean_TslaSRdummy     = train(x = XtrainMatSentiMean_tslaSRdummy, 
+                                 y = Ytrain_tslaSRdummy_,
+                            method = "rpart",
+                            #parms = list(prior = c(.65,.35),split = "gini"),
+                            parms = list(split = "gini"),
+                            tuneGrid = tuneGridTree_TslaSRdummy,
+                            trControl = trControl)
+
+#plot(rpartOutSentiMean_TslaSRdummy$finalModel, margin = rep(.1,4),
+#    main = "Classification Tree with Sentiments(Mean) - TSLA stockReturn(dummy)")
+#text(rpartOutSentiMean_TslaSRdummy$finalModel, cex = 0.6, digits = 1)
+
+
+
+####GOOG
+set.seed(2022)
+cl = parallel::makeCluster(8)
+doParallel::registerDoParallel(cl)
+#trControl = caret::trainControl(method = "repeatedcv", repeats = 5, 
+                               # number = 10, classProbs = TRUE)
+#Y1
+tuneGridTree_GoogHL = expand.grid(cp = c(0,0.0001,0.001,0.01,0.1,0.15,0.5,1))
+rpartOutSentiMean_GoogHL     = train(x = XtrainMatSentiMean_googHL, y = Ytrain_googHL,
+                            method = "rpart",
+                            tuneGrid = tuneGridTree_GoogHL,
+                            trControl = trControl,
+                            control = rpart.control(minsplit = 1, 
+                                                    minbucket = 1))
+plot(rpartOutSentiMean_GoogHL$finalModel, margin = rep(.1,4),
+     main = "Classification Tree with Sentiments(Mean) - GOOG diffHighLow")
+text(rpartOut_GoogHL$finalModel, cex = 0.6, digits = 1)
+
+#Y2
+tuneGridTree_GoogSR = expand.grid(cp = c(0,0.0001,0.001,0.01,0.1,0.15,0.5,1))
+rpartOutSentiMean_GoogSR = train(x = XtrainMatSentiMean_googSR, y = Ytrain_googSR,
+                            method = "rpart",
+                            tuneGrid = tuneGridTree_GoogSR,
+                            trControl = trControl,
+                            control = rpart.control(minsplit = 1, minbucket = 1))
+rpartOutSentiMean_GoogSR$finalModel #just a root
+#plot(rpartOut_GoogSR$finalModel, margin = rep(.1,4))
+#text(rpartOut_TslaSR$finalModel, cex = 0.6, digits = 1)
+
+
+#Y3
+
+tuneGridTree_GoogSRdummy = expand.grid(cp = c(0,0.0001,0.001,0.01,0.05,0.1,0.15,1))
+rpartOutSentiMean_GoogSRdummy     = train(x = XtrainMatSentiMean_googSRdummy, 
+                                 y = Ytrain_googSRdummy_,
+                            method = "rpart",
+                            parms = list(split = "gini"),
+                            tuneGrid = tuneGridTree_GoogSRdummy,
+                            trControl = trControl,
+                            control = rpart.control(minsplit = 1, minbucket = 1))
+
+#rpartOutSentiMean_GoogSRdummy$finalModel
+#plot(rpartOutSentiMean_GoogSRdummy$finalModel, margin = rep(.1,4),
+#     main = "Classification Tree with Sentiments(Mean) - GOOG stockReturnDummy")
+#text(rpartOutSentiMean_GoogSRdummy$finalModel, cex = 0.6, digits = 1)
+
+
+```
+
+####Random Forest
+
+```{r randomForestMean}
+set.seed(2020)
+cl = parallel::makeCluster(8)
+doParallel::registerDoParallel(cl)
+####TSLA
+#trControl = caret::trainControl(method = "repeatedcv", repeats = 5, 
+#                                number = 10, classProbs = TRUE)
+#Y1
+tuneGridRangerSentiMean_TslaHL = data.frame(splitrule = "variance", min.node.size = 5,
+                                   mtry = round(sqrt(ncol(XtrainSentiMean_tslaHL))))
+rfOutSentiMean_tslaHL  = train(x = XtrainMatSentiMean_tslaHL, y = Ytrain_tslaHL, 
+                      method = "ranger",
+                      num.trees = 500,
+                      tuneGrid = tuneGridRangerSentiMean_TslaHL, 
+                      importance = "permutation",
+                      trControl = trControl)
+#rfOutSentiMean_tslaHL$finalModel
+
+#print(rfOut_tslaHL)
+
+#Y2
+tuneGridRangerSentiMean_TslaSR = data.frame(splitrule = "variance", min.node.size = 5,
+                                   mtry = round(sqrt(ncol(XtrainSentiMean_tslaSR))))
+rfOutSentiMean_tslaSR  = train(x = XtrainMatSentiMean_tslaSR, y = Ytrain_tslaSR, 
+                      method = "ranger",
+                      num.trees = 500,
+                      tuneGrid = tuneGridRangerSentiMean_TslaSR, 
+                      importance = "permutation",
+                      trControl = trControl)
+#rfOutSentiMean_tslaSR$finalModel
+
+#Y3
+set.seed(2020)
+cl = parallel::makeCluster(8)
+doParallel::registerDoParallel(cl)
+
+tuneGridRangerSentiMean_TslaSRdummy = data.frame(splitrule = "gini", min.node.size = 10,
+                                   mtry = round(sqrt(ncol(XtrainSentiMean_tslaSRdummy))))
+rfOutSentiMean_tslaSRdummy  = train(x = XtrainMatSentiMean_tslaSRdummy, 
+                           y = as.matrix(Ytrain_tslaSRdummy_) , 
+                      method = "ranger",
+                      num.trees = 500,
+                      tuneGrid = tuneGridRangerSentiMean_TslaSRdummy, 
+                      importance = "permutation",
+                      trControl = trControl,
+                      classification = TRUE)
+#rfOutSentiMean_tslaSRdummy$finalModel
+
+####GOOG
+#trControl = caret::trainControl(method = "repeatedcv", repeats = 5, 
+#                                number = 10, classProbs = TRUE)
+#Y1
+
+tuneGridRangerSentiMean_GoogHL = data.frame(splitrule = "variance", min.node.size = 5,
+                                   mtry = round(sqrt(ncol(XtrainSentiMean_googHL))))
+rfOutSentiMean_googHL  = train(x = XtrainMatSentiMean_googHL, y = Ytrain_googHL, 
+                      method = "ranger",
+                      num.trees = 500,
+                      tuneGrid = tuneGridRangerSentiMean_GoogHL, 
+                      importance = "permutation",
+                      trControl = trControl)
+#rfOutSentiMean_googHL$finalModel
+
+#Y2
+
+tuneGridRangerSentiMean_GoogSR = data.frame(splitrule = "variance", min.node.size = 5,
+                                   mtry = round(sqrt(ncol(XtrainSentiMean_googSR))))
+rfOutSentiMean_googSR  = train(x = XtrainMatSentiMean_googSR, y = Ytrain_googSR, 
+                      method = "ranger",
+                      num.trees = 500,
+                      tuneGrid = tuneGridRangerSentiMean_GoogSR, 
+                      importance = "permutation",
+                      trControl = trControl)
+rfOutSentiMean_googSR$finalModel
+
+#Y3
+tuneGridRangerSentiMean_GoogSRdummy = data.frame(splitrule = "gini", min.node.size = 10,
+                                   mtry = round(sqrt(ncol(XtrainSentiMean_googSRdummy))))
+rfOutSentiMean_googSRdummy  = train(x = XtrainMatSentiMean_googSRdummy, 
+                                   y =as.matrix(Ytrain_googSRdummy_), 
+                      method = "ranger",
+                      num.trees = 500,
+                      tuneGrid = tuneGridRangerSentiMean_GoogSRdummy, 
+                      importance = "permutation",
+                      trControl = trControl)
+rfOutSentiMean_googSRdummy$finalModel
+
+
+#List of Tuning Parameters
+tuneParaRFSentiMean = rbind(
+  rfOutSentiMean_tslaHL$bestTune,
+  rfOutSentiMean_tslaSR$bestTune,
+  rfOutSentiMean_tslaSRdummy$bestTune,
+  rfOutSentiMean_googHL$bestTune,
+  rfOutSentiMean_googSR$bestTune,
+  rfOutSentiMean_googSRdummy$bestTune
+  )
+
+
+row.names(tuneParaRFSentiMean) = c("TSLA - diffHighLow", "TSLA - stockReturn", 
+                            "TSLA - stockReturn(Dummy)","GOOG - diffHighLow", 
+                            "GOOG - stockReturn","GOOG - stockReturn(Dummy)")
+
+knitr::kable(
+ tuneParaRFSentiMean,
+ col.names = c("mtry", "splitrule", "min.node.size"),
+ caption   = "Table 4: Random Forest regression and Classification with Sentiments(Mean) - Tuning Parameters",
+ align     = "lccrr"
+)
+
+```
+
+####Boosting
+
+```{r boostingMean}
+set.seed(2020)
+cl = parallel::makeCluster(8)
+doParallel::registerDoParallel(cl)
+####TSLA
+#Y1
+tuneGridRandom_TslaHL = expand.grid('nrounds'= c(50,150,500,1000,2000,3000),
+                                   'max_depth' = 6,
+                                   'eta' = c(0.01,0.03,0.05),
+                                   'gamma' = 0,
+                                   'colsample_bytree' = 1,
+                                   'min_child_weight' = 0,
+                                   'subsample' = c(0.5, 0.8))
+
+boostOutRandomSentiMean_TslaHL = train(x = XtrainSentiMean_tslaHL, y = Ytrain_tslaHL,
+                              method = 'xgbTree', verbose = 0,
+                              tuneGrid = tuneGridRandom_TslaHL,
+                              trControl = trControl)
+#plot(boostOutRandomSentiMean_TslaHL)
+
+#Y2
+set.seed(2020)
+cl = parallel::makeCluster(8)
+doParallel::registerDoParallel(cl)
+tuneGridRandom_TslaSR = expand.grid('nrounds'= c(50,150,500,1000,2000,3000),
+                                   'max_depth' = 6,
+                                   'eta' = c(0.01,0.03,0.05),
+                                   'gamma' = 0,
+                                   'colsample_bytree' = 1,
+                                   'min_child_weight' = 0,
+                                   'subsample' = c(0.5, 0.8))
+
+boostOutRandomSentiMean_TslaSR = train(x = XtrainSentiMean_tslaSR, y = Ytrain_tslaSR,
+                              method = 'xgbTree', verbose = 0,
+                              tuneGrid = tuneGridRandom_TslaSR,
+                              trControl = trControl)
+#plot(boostOutRandomSentiMean_TslaSR)
+
+
+#Y3
+
+
+tuneGridRandom_TslaSRdummy = expand.grid(
+                                   'nrounds'= c(50,150,500,1000,2000,3000),
+                                   'max_depth' = 6,
+                                   'eta' = c(0.01,0.03,0.05),
+                                   'gamma' = 0,
+                                   'colsample_bytree' = 1,
+                                   'min_child_weight' = 0,
+                                   'subsample' = c(0.5, 0.8))
+
+boostOutRandomSentiMean_TslaSRdummy = train(x = XtrainSentiMean_tslaSRdummy, 
+                                   y = Ytrain_tslaSRdummy_,
+                              method = 'xgbTree', verbose = 0,
+                              tuneGrid = tuneGridRandom_TslaSRdummy,
+                              trControl = trControl)
+#plot(boostOutRandomSentiMean_TslaSRdummy)
+
+
+
+
+
+
+####GOOG
+set.seed(2020)
+cl = parallel::makeCluster(8)
+doParallel::registerDoParallel(cl)
+#Y1
+tuneGridRandom_GoogHL = expand.grid('nrounds'= c(50,150,500,1000,2000,3000),
+                                   'max_depth' = 6,
+                                   'eta' = c(0.01,0.03,0.05),
+                                   'gamma' = 0,
+                                   'colsample_bytree' = 1,
+                                   'min_child_weight' = 0,
+                                   'subsample' = c(0.5, 0.8))
+
+boostOutRandomSentiMean_GoogHL = train(x = XtrainSentiMean_googHL, y = Ytrain_googHL,
+                              method = 'xgbTree', verbose = 0,
+                              tuneGrid = tuneGridRandom_GoogHL,
+                              trControl = trControl)
+#plot(boostOutRandomSentiMean_GoogHL)
+
+#Y2
+tuneGridRandom_GoogSR = expand.grid('nrounds'= c(50,150,500,1000,2000,3000),
+                                   'max_depth' = 6,
+                                   'eta' = c(0.01,0.03,0.05),
+                                   'gamma' = 0,
+                                   'colsample_bytree' = 1,
+                                   'min_child_weight' = 0,
+                                   'subsample' = c(0.5, 0.8))
+
+boostOutRandomSentiMean_GoogSR = train(x = XtrainSentiMean_googSR, y = Ytrain_googSR,
+                              method = 'xgbTree', verbose = 0,
+                              tuneGrid = tuneGridRandom_GoogSR,
+                              trControl = trControl)
+#plot(boostOutRandomSentiMean_GoogSR)
+#boostOutRandomSentiMean_GoogSR$bestTune$nrounds
+
+#Y3
+tuneGridRandom_GoogSRdummy = expand.grid(
+                                   'nrounds'= c(50,150,500,1000,2000,3000),
+                                   'max_depth' = 6,
+                                   'eta' = c(0.01,0.03,0.05),
+                                   'gamma' = 0,
+                                   'colsample_bytree' = 1,
+                                   'min_child_weight' = 0,
+                                   'subsample' = c(0.5, 0.8))
+
+boostOutRandomSentiMean_GoogSRdummy = train(x = XtrainSentiMean_googSRdummy, 
+                                   y = Ytrain_googSRdummy_,
+                              method = 'xgbTree', verbose = 0,
+                              tuneGrid = tuneGridRandom_GoogSRdummy,
+                              trControl = trControl)
+#plot(boostOutRandomSentiMean_GoogSRdummy)
+
+#boostOutRandomSentiMean_GoogSRdummy$bestTune
+
+###Overview
+
+plot(boostOutRandomSentiMean_TslaHL, 
+     main = "Boosting with Sentiments(Mean): TSLA diffHighLow")
+plot(boostOutRandomSentiMean_TslaSR, 
+     main = "Boosting with Sentiments(Mean): TSLA stockReturn")
+plot(boostOutRandomSentiMean_TslaSRdummy, 
+     main = "Boosting with Sentiments(Mean): TSLA stockReturn(Dummy)")
+
+plot(boostOutRandomSentiMean_GoogHL, 
+     main = "Boosting with Sentiments(Mean): GOOG diffHighLow")
+plot(boostOutRandomSentiMean_GoogSR, 
+     main = "Boosting with Sentiments(Mean): GOOG stockReturn")
+plot(boostOutRandomSentiMean_GoogSRdummy, 
+     main = "Boosting with Sentiments(Mean): GOOG stockReturn(Dummy)")
+
+
+#List of Tuning Parameters
+tuneParaBoostSentiMean = rbind(
+  boostOutRandomSentiMean_TslaHL$bestTune,
+  boostOutRandomSentiMean_TslaSR$bestTune,
+  boostOutRandomSentiMean_TslaSRdummy$bestTune,
+  boostOutRandomSentiMean_GoogHL$bestTune,
+  boostOutRandomSentiMean_GoogSR$bestTune,
+  boostOutRandomSentiMean_GoogSRdummy$bestTune
+  )
+
+
+row.names(tuneParaBoostSentiMean) = c("TSLA - diffHighLow", "TSLA - stockReturn", 
+                            "TSLA - stockReturn(Dummy)","GOOG - diffHighLow", 
+                            "GOOG - stockReturn","GOOG - stockReturn(Dummy)")
+
+knitr::kable(
+ tuneParaBoostSentiMean,
+ col.names = c("nrounds","max_depth","eta","gamma","colsample_bytree",
+               "min_child_weight","subsample"),
+ caption   = "Table 5: Boosting regression and Classification with Sentiments(Mean)- Tuning Parameters",
+ align     = "lccrr"
+)
+
+```
+
+####Performance Review
+
+```{r importanceBoostingMean}
+####TSLA
+(boostImportanceSentiMean_TslaHL = xgboost::xgb.importance(model = boostOutRandomSentiMean_TslaHL$finalModel))
+
+(boostImportanceSentiMean_TslaSR = xgboost::xgb.importance(model = boostOutRandomSentiMean_TslaSR$finalModel))
+
+(boostImportanceSentiMean_TslaSRdummy = xgboost::xgb.importance(model = boostOutRandomSentiMean_TslaSRdummy$finalModel))
+
+####GOOG
+(boostImportanceSentiMean_GoogHL = xgboost::xgb.importance(model = boostOutRandomSentiMean_GoogHL$finalModel))
+
+(boostImportanceSentiMean_GoogSR = xgboost::xgb.importance(model = boostOutRandomSentiMean_GoogSR$finalModel))
+
+(boostImportanceSentiMean_GoogSRdummy = xgboost::xgb.importance(model = boostOutRandomSentiMean_GoogSRdummy$finalModel))
+```
+
+```{r judgePerformanceMean}
+set.seed(2020)
+################Regression
+####TSLA
+#Y1
+resultsTestSentiMean_TslaHL  = data.frame(
+  YhatGlmnet_SentiMean = c(predict(glmnetOutTslaHL_SentiMean, XtestMatSentiMean_tslaHL,
+                         s = elasticOutTslaHL_SentiMean$bestTune$lambda)),
+  YhatMARS_SentiMean   = c(predict(marsOutTslaHL_SentiMean, XtestMatSentiMean_tslaHL)),
+  YhatTrees_SentiMean  = predict(rpartOutSentiMean_TslaHL, XtestMatSentiMean_tslaHL),
+  YhatRF_SentiMean     = predict(rfOutSentiMean_tslaHL, XtestMatSentiMean_tslaHL),
+  YhatBoost_SentiMean  = predict(boostOutRandomSentiMean_TslaHL, XtestMatSentiMean_tslaHL)
+)
+
+
+
+par(mar=c(10,5,4,2))
+plot(1:length(resultsTestSentiMean_TslaHL), 
+     sapply(resultsTestSentiMean_TslaHL, function(Yhat){mean((Yhat - Ytest_tslaHL)^2)}),
+     xlab = '', xaxt = 'n', pch = 16, ylab = 'test error', 
+     main = 'TSLA with Sentiments(Mean) - Supervisor = difference between highest and lowest prices')
+axis(1, labels = names(resultsTestSentiMean_TslaHL), 
+     at = 1:ncol(resultsTestSentiMean_TslaHL), las = 3)
+
+#Y2
+set.seed(2020)
+resultsTestSentiMean_TslaSR  = data.frame(
+  YhatGlmnet_SentiMean = c(predict(glmnetOutTslaSR_SentiMean, XtestMatSentiMean_tslaSR,
+                         s = elasticOutTslaSR_SentiMean$bestTune$lambda)),
+  YhatMARS_SentiMean   = c(predict(marsOutTslaSR_SentiMean, XtestMatSentiMean_tslaSR)),
+  YhatTrees_SentiMean  = predict(rpartOutSentiMean_TslaSR, XtestMatSentiMean_tslaSR),
+  YhatRF_SentiMean     = predict(rfOutSentiMean_tslaSR, XtestMatSentiMean_tslaSR),
+  YhatBoost_SentiMean  = predict(boostOutRandomSentiMean_TslaSR, XtestMatSentiMean_tslaSR)
+)
+
+par(mar=c(10,5,4,2))
+plot(1:length(resultsTestSentiMean_TslaSR), 
+     sapply(resultsTestSentiMean_TslaSR, function(Yhat){mean((Yhat - Ytest_tslaSR)^2)}),
+     xlab = '', xaxt = 'n', pch = 16, ylab = 'test error', 
+     main = 'TSLA with Sentiments(Mean) - Supervisor = stock return')
+axis(1, labels = names(resultsTestSentiMean_TslaSR), 
+     at = 1:ncol(resultsTestSentiMean_TslaSR), las = 3)
+
+####GOOG
+#Y1
+set.seed(2020)
+resultsTestSentiMean_GoogHL  = data.frame(
+  YhatGlmnet_SentiMean = c(predict(glmnetOutGoogHL_SentiMean, XtestMatSentiMean_googHL,
+                         s = elasticOutGoogHL_SentiMean$bestTune$lambda)),
+  YhatMARS_SentiMean   = c(predict(marsOutGoogHL_SentiMean, XtestMatSentiMean_googHL)),
+  YhatTrees_SentiMean  = predict(rpartOutSentiMean_GoogHL, XtestMatSentiMean_googHL),
+  YhatRF_SentiMean     = predict(rfOutSentiMean_googHL, XtestMatSentiMean_googHL),
+  YhatBoost_SentiMean  = predict(boostOutRandomSentiMean_GoogHL, XtestMatSentiMean_googHL)
+)
+
+par(mar=c(10,5,4,2))
+plot(1:length(resultsTestSentiMean_GoogHL), 
+     sapply(resultsTestSentiMean_GoogHL, function(Yhat){mean((Yhat - Ytest_googHL)^2)}),
+     xlab = '', xaxt = 'n', pch = 16, ylab = 'test error', 
+     main = 'GOOG with Sentiments(Mean) - Supervisor = difference between highest and lowest prices')
+axis(1, labels = names(resultsTestSentiMean_GoogHL), 
+     at = 1:ncol(resultsTestSentiMean_GoogHL), las = 3)
+
+#Y2
+set.seed(2020)
+resultsTestSentiMean_GoogSR  = data.frame(
+  YhatGlmnet_SentiMean = c(predict(glmnetOutGoogSR_SentiMean, XtestMatSentiMean_googSR,
+                         s = elasticOutGoogSR_SentiMean$bestTune$lambda)),
+  YhatMARS_SentiMean   = c(predict(marsOutGoogSR_SentiMean, XtestMatSentiMean_googSR)),
+  YhatTrees_SentiMean  = predict(rpartOutSentiMean_GoogSR, XtestMatSentiMean_googSR),
+  YhatRF_SentiMean     = predict(rfOutSentiMean_googSR, XtestMatSentiMean_googSR),
+  YhatBoost_SentiMean  = predict(boostOutRandomSentiMean_GoogSR, XtestMatSentiMean_googSR)
+)
+
+par(mar=c(10,5,4,2))
+plot(1:length(resultsTestSentiMean_GoogSR), 
+     sapply(resultsTestSentiMean_GoogSR, function(Yhat){mean((Yhat - Ytest_googSR)^2)}),
+     xlab = '', xaxt = 'n', pch = 16, ylab = 'test error', 
+     main = 'GOOG with Sentiments(Mean)- Supervisor = stock return')
+axis(1, labels = names(resultsTestSentiMean_GoogSR), at = 1:ncol(resultsTestSentiMean_GoogSR), las = 3)
+
+
+
+
+
+
+
+
+
+
+###################Classification
+####TSLA
+#TSLA MARS(FDA)- Y3
+YhatTestFDASentiMean_TslaSRdummyProb = predict(marsOutTslaSRdummy_SentiMean,
+                                              XtestSentiMean_tslaSRdummy,
+                                              type = 'prob')
+YhatTestFDASentiMean_TslaSRdummy     = ifelse(YhatTestFDASentiMean_TslaSRdummyProb[,2] > 0.5, '1','0')
+
+table(YhatTestFDASentiMean_TslaSRdummy, Ytest_tslaSRdummy)
+(TslaSRdummySentiMean_accuracyFDA = Mean(diag(table(YhatTestFDASentiMean_TslaSRdummy, Ytest_tslaSRdummy)))/length(Ytest_tslaSRdummy))
+
+#TSLA Classification Tree - Y3
+YhatTestTreeSentiMean_TslaSRdummyProb = predict(rpartOutSentiMean_TslaSRdummy,
+                                               XtestSentiMean_tslaSRdummy,
+                                               type = 'prob')
+YhatTestTreeSentiMean_TslaSRdummy     = ifelse(YhatTestTreeSentiMean_TslaSRdummyProb[,2] > 0.5, '1','0')
+table(YhatTestTreeSentiMean_TslaSRdummy, Ytest_tslaSRdummy)
+(TslaSRdummySentiMean_accuracyTree = Mean(diag(table(YhatTestTreeSentiMean_TslaSRdummy, Ytest_tslaSRdummy)))/length(Ytest_tslaSRdummy))
+
+#TSLA Random Forest - Y3
+
+YhatTestRFSentiMean_TslaSRdummyRaw = predict(rfOutSentiMean_tslaSRdummy,
+                                            XtestMatSentiMean_tslaSRdummy,
+                                            type = 'raw')
+YhatTestRFSentiMean_TslaSRdummy     = ifelse(YhatTestRFSentiMean_TslaSRdummyRaw == "Yes", '1','0')
+
+table(YhatTestRFSentiMean_TslaSRdummy, Ytest_tslaSRdummy)
+(TslaSRdummySentiMean_accuracyRF = Mean(diag(table(YhatTestRFSentiMean_TslaSRdummy, Ytest_tslaSRdummy)))/length(Ytest_tslaSRdummy))
+
+#TSLA Boosting - Y3
+YhatTestBoostSentiMean_TslaSRdummyProb = predict(boostOutRandomSentiMean_TslaSRdummy,
+                                        XtestMatSentiMean_tslaSRdummy,type = 'prob')
+YhatTestBoostSentiMean_TslaSRdummy     = ifelse(YhatTestBoostSentiMean_TslaSRdummyProb[,2] > 0.5, '1','0')
+
+table(YhatTestBoostSentiMean_TslaSRdummy, Ytest_tslaSRdummy)
+(TslaSRdummySentiMean_accuracyBoost = Mean(diag(table(YhatTestBoostSentiMean_TslaSRdummy, Ytest_tslaSRdummy)))/length(Ytest_tslaSRdummy))
+
+#Meanmary - TSLA - Classification
+resultsTestClassSentiMean_Tsla = data.frame(
+  accuracyFDA_SentiMean  = TslaSRdummySentiMean_accuracyFDA,
+  accuracyTree_SentiMean = TslaSRdummySentiMean_accuracyTree,
+  accuracyRF_SentiMean = TslaSRdummySentiMean_accuracyRF,
+  accuracyBoost_SentiMean = TslaSRdummySentiMean_accuracyBoost
+)
+par(mar=c(11,5,4,2))
+plot(1:length(resultsTestClassSentiMean_Tsla), 
+     resultsTestClassSentiMean_Tsla,
+     xlab = '', xaxt = 'n', pch = 16, ylab = 'accuracy', 
+     main = 'TSLA with Sentiments(Mean) - Supervisor = stock return (dummy)')
+axis(1, labels = names(resultsTestClassSentiMean_Tsla), 
+     at = 1:ncol(resultsTestClassSentiMean_Tsla), las = 3)
+
+
+####GOOG
+#GOOG MARS(FDA) - Y3
+YhatTestFDASentiMean_GoogSRdummyProb = predict(marsOutGoogSRdummy_SentiMean,
+                                              XtestSentiMean_googSRdummy,
+                                              type = 'prob')
+
+YhatTestFDASentiMean_GoogSRdummy     = ifelse(YhatTestFDASentiMean_GoogSRdummyProb[,2] > 0.5, '1','0')
+
+table(YhatTestFDASentiMean_GoogSRdummy, Ytest_googSRdummy)
+(GoogSRdummySentiMean_accuracyFDA = Mean(diag(table(YhatTestFDASentiMean_GoogSRdummy, Ytest_googSRdummy)))/length(Ytest_googSRdummy))
+
+#GOOG Classification Tree - Y3
+YhatTestTreeSentiMean_GoogSRdummyProb = predict(rpartOutSentiMean_GoogSRdummy, Xtest_googSRdummy,
+                                  type = 'prob')
+YhatTestTreeSentiMean_GoogSRdummy     = ifelse(YhatTestTreeSentiMean_GoogSRdummyProb[,2] > 0.5, '1','0')
+table(YhatTestTreeSentiMean_GoogSRdummy, Ytest_googSRdummy)
+(GoogSRdummySentiMean_accuracyTree = Mean(diag(table(YhatTestTreeSentiMean_GoogSRdummy, Ytest_googSRdummy)))/length(Ytest_googSRdummy))
+
+#GOOG Random Forest - Y3
+YhatTestRFSentiMean_GoogSRdummyRaw = predict(rfOutSentiMean_googSRdummy,
+                                            XtestSentiMean_googSRdummy,
+                                            type = 'raw')
+
+YhatTestRFSentiMean_GoogSRdummy     = ifelse(YhatTestRFSentiMean_GoogSRdummyRaw == "Yes", '1','0')
+
+table(YhatTestRFSentiMean_GoogSRdummy, Ytest_googSRdummy)
+(GoogSRdummySentiMean_accuracyRF = Mean(diag(table(YhatTestRFSentiMean_GoogSRdummy, Ytest_googSRdummy)))/length(Ytest_googSRdummy))
+
+
+#GOOG Boosting - Y3
+YhatTestBoostSentiMean_GoogSRdummyProb = predict(boostOutRandomSentiMean_GoogSRdummy,
+                                        XtestMatSentiMean_googSRdummy,type = 'prob')
+YhatTestBoostSentiMean_GoogSRdummy     = ifelse(YhatTestBoostSentiMean_GoogSRdummyProb[,2] > 0.5, '1','0')
+
+table(YhatTestBoostSentiMean_GoogSRdummy, Ytest_googSRdummy)
+(GoogSRdummySentiMean_accuracyBoost = Mean(diag(table(YhatTestBoostSentiMean_GoogSRdummy, Ytest_googSRdummy)))/length(Ytest_googSRdummy))
+
+
+#Meanmary - GOOG - Classification
+resultsTestClassSentiMean_Goog = data.frame(
+  accuracyFDA_SentiMean   = GoogSRdummySentiMean_accuracyFDA,
+  accuracyTree_SentiMean  = GoogSRdummySentiMean_accuracyTree,
+  accuracyRF_SentiMean    = GoogSRdummySentiMean_accuracyRF,
+  accuracyBoost_SentiMean = GoogSRdummySentiMean_accuracyBoost
+)
+
+par(mar=c(10,5,4,2))
+plot(1:length(resultsTestClassSentiMean_Goog), 
+     resultsTestClassSentiMean_Goog,
+     xlab = '', xaxt = 'n', pch = 16,  ylab = 'accuracy', 
+     main = 'GOOG with Sentiments(Mean) - Supervisor = stock return (dummy)')
+axis(1, labels = names(resultsTestClassSentiMean_Goog), 
+     at = 1:ncol(resultsTestClassSentiMean_Goog), las = 3)
+```
 
 
 
