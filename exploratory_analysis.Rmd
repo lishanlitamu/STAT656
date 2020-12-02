@@ -2047,6 +2047,7 @@ table(YhatTestBoost_TslaSRdummy, Ytest_tslaSRdummy)
 
 #Summary - TSLA - Classification
 resultsTestClass_Tsla = data.frame(
+  accuracyLogistic = accuracyLinear_TslaSRdummy,#Logistic
   accuracyFDA  = TslaSRdummy_accuracyFDA,
   accuracyTree = TslaSRdummy_accuracyTree,
   accuracyRF = TslaSRdummy_accuracyRF,
@@ -2098,6 +2099,7 @@ table(YhatTestBoost_GoogSRdummy, Ytest_googSRdummy)
 
 #Summary - GOOG - Classification
 resultsTestClass_Goog = data.frame(
+  accuracyLogistic = accuracyLinear_GoogSRdummy,#Logistic
   accuracyFDA   = GoogSRdummy_accuracyFDA,
   accuracyTree  = GoogSRdummy_accuracyTree,
   accuracyRF    = GoogSRdummy_accuracyRF,
@@ -2241,7 +2243,7 @@ XtestMatSentiSum_googSRdummy  = as.matrix(XtestSentiSum_googSRdummy)
 ```
 
 
-```{r elasticNetTuningParameters}
+```{r elasticNetTuningParametersSum}
 set.seed(2020)
 cl = parallel::makeCluster(8)
 doParallel::registerDoParallel(cl)
@@ -2323,7 +2325,7 @@ knitr::kable(
 ```
 
 
-```{r elasticNet}
+```{r elasticNetSum}
 ####Supervisor Y1 = YtslaStandardizedWithDummy$diffHighLowTomorrow
 ####TSLA
 glmnetOutTslaHL_SentiSum       = glmnet(x = XtrainMatSentiSum_tslaHL, y = Ytrain_tslaHL, 
@@ -2415,7 +2417,9 @@ table(YhatTestSentiSum_TslaSRdummy,YhatTestSentiSum_TslaSRdummy)
 betaHatGlmnetTslaSRdummy_SentiSum = coef(glmnetOutTslaSRdummy_SentiSum, 
                                 s = elasticOutTslaSRdummy_SentiSum$bestTune$lambda)
 #Accuracy
-accuracyLinearSentiSum_TslaSRdummy = mean(YhatTestSentiSum_TslaSRdummy==Ytest_tslaSRdummy)
+table(YhatTestSentiSum_TslaSRdummy,Ytest_tslaSRdummy)
+(accuracyLinearSentiSum_TslaSRdummy = sum(diag(table(YhatTestSentiSum_TslaSRdummy, Ytest_tslaSRdummy)))/length(Ytest_tslaSRdummy))
+
 
 probHatTestSentiSum_TslaSRdummy_ = predict(elasticOutTslaSRdummy_SentiSum,
                                            XtestMatSentiSum_tslaSRdummy,
@@ -2465,7 +2469,9 @@ table(YhatTestSentiSum_GoogSRdummy,YhatTestSentiSum_GoogSRdummy)
 betaHatGlmnetGoogSRdummy_SentiSum = coef(glmnetOutGoogSRdummy_SentiSum, 
                                 s = elasticOutGoogSRdummy_SentiSum$bestTune$lambda)
 #Accuracy
-accuracyLinearSentiSum_GoogSRdummy = mean(YhatTestSentiSum_GoogSRdummy==Ytest_googSRdummy)
+(accuracyLinearSentiSum_GoogSRdummy = sum(diag(table(YhatTestSentiSum_GoogSRdummy, Ytest_googSRdummy)))/length(Ytest_googSRdummy))
+
+
 probHatTestSentiSum_GoogSRdummy_ = predict(elasticOutGoogSRdummy_SentiSum,
                                            XtestMatSentiSum_googSRdummy,
                                    s = elasticOutGoogSRdummy_SentiSum$bestTune$lambda,
@@ -3187,7 +3193,8 @@ table(YhatTestBoostSentiSum_TslaSRdummy, Ytest_tslaSRdummy)
 
 #Summary - TSLA - Classification
 resultsTestClassSentiSum_Tsla = data.frame(
-  accuracyFDA_SentiSum  = TslaSRdummySentiSum_accuracyFDA,
+  accuracyLogistic_SentiSum = accuracyLinearSentiSum_TslaSRdummy,#Logistic
+  accuracyFDA_SentiSum  = TslaSRdummySentiSum_accuracyFDA,#MARS
   accuracyTree_SentiSum = TslaSRdummySentiSum_accuracyTree,
   accuracyRF_SentiSum = TslaSRdummySentiSum_accuracyRF,
   accuracyBoost_SentiSum = TslaSRdummySentiSum_accuracyBoost
@@ -3213,7 +3220,7 @@ table(YhatTestFDASentiSum_GoogSRdummy, Ytest_googSRdummy)
 (GoogSRdummySentiSum_accuracyFDA = sum(diag(table(YhatTestFDASentiSum_GoogSRdummy, Ytest_googSRdummy)))/length(Ytest_googSRdummy))
 
 #GOOG Classification Tree - Y3
-YhatTestTreeSentiSum_GoogSRdummyProb = predict(rpartOutSentiSum_GoogSRdummy, Xtest_googSRdummy,
+YhatTestTreeSentiSum_GoogSRdummyProb = predict(rpartOutSentiSum_GoogSRdummy, XtestSentiSum_googSRdummy,
                                   type = 'prob')
 YhatTestTreeSentiSum_GoogSRdummy     = ifelse(YhatTestTreeSentiSum_GoogSRdummyProb[,2] > 0.5, '1','0')
 table(YhatTestTreeSentiSum_GoogSRdummy, Ytest_googSRdummy)
@@ -3241,6 +3248,7 @@ table(YhatTestBoostSentiSum_GoogSRdummy, Ytest_googSRdummy)
 
 #Summary - GOOG - Classification
 resultsTestClassSentiSum_Goog = data.frame(
+  accuracyLogistic_SentiSum = accuracyLinearSentiSum_GoogSRdummy,#Logistic
   accuracyFDA_SentiSum   = GoogSRdummySentiSum_accuracyFDA,
   accuracyTree_SentiSum  = GoogSRdummySentiSum_accuracyTree,
   accuracyRF_SentiSum    = GoogSRdummySentiSum_accuracyRF,
@@ -3257,19 +3265,102 @@ axis(1, labels = names(resultsTestClassSentiSum_Goog),
 ```
 
 ```{r FinalPerformanceReview}
-
-
-
-colVec = rainbow(3)
+#Regression
+#TSLA
+colVec = rainbow(8)
 par(mar = c(7,5,4,2))
-plot(1:ncol(resultsTestClassSentiSum_Goog), resultsTestClassSentiSum_Goog, col = colVec[1], 
-     pch = 15, ylim = c(0,1), ylab = "GOOG - Supervisor = stock return (dummy)", xlab = " " )
-points(1:ncol(resultsTestClass_Goog),  resultsTestClass_Goog,  col = colVec[2], pch = 16)
+plot(1:ncol(resultsTest_TslaHL), 
+     sapply(resultsTest_TslaHL, function(Yhat){mean((Yhat - Ytest_tslaHL)^2)}), 
+     col = colVec[1],pch = 15, ylim = c(1.2,3.5), ylab = "TSLA Test Error- Supervisor = diffHighLow", xlab = " " )
+points(1:ncol(resultsTestSentiSum_TslaHL),  
+       sapply(resultsTestSentiSum_TslaHL, function(Yhat){mean((Yhat - Ytest_tslaHL)^2)}),  
+       col = colVec[2], pch = 16)
+points(1:ncol(resultsTestSentiMean_TslaHL),  
+       sapply(resultsTestSentiMean_TslaHL, function(Yhat){mean((Yhat - Ytest_tslaHL)^2)}),  
+       col = colVec[3], pch = 17)
+axis(1, labels = names(resultsTest_TslaHL), at = 1:ncol(resultsTest_TslaHL), 
+     las = 3)
+legend('topright', col = colVec, pch = c(15:21), 
+       legend = c('without Sentiments','with Sentiments(Sum)','with Sentiments(Mean)'))
 
+par(mar = c(7,5,4,2))
+plot(1:ncol(resultsTest_TslaSR), 
+     sapply(resultsTest_TslaSR, function(Yhat){mean((Yhat - Ytest_tslaSR)^2)}), 
+     col = colVec[1],pch = 15, ylim = c(1.2,1.35), ylab = "TSLA Test Error - Supervisor = stock return", xlab = " " )
+points(1:ncol(resultsTestSentiSum_TslaSR),  
+       sapply(resultsTestSentiSum_TslaSR, function(Yhat){mean((Yhat - Ytest_tslaSR)^2)}),  
+       col = colVec[2], pch = 16)
+points(1:ncol(resultsTestSentiMean_TslaSR),  
+       sapply(resultsTestSentiMean_TslaSR, function(Yhat){mean((Yhat - Ytest_tslaSR)^2)}),  
+       col = colVec[3], pch = 17)
+axis(1, labels = names(resultsTest_TslaSR), at = 1:ncol(resultsTest_TslaSR), 
+     las = 3)
+#legend('topright', col = colVec, pch = c(15:21), 
+#       legend = c('without Sentiments','with Sentiments(Sum)','with Sentiments(Mean)'))
+
+
+
+#Regression
+#GOOG
+
+par(mar = c(7,5,4,2))
+plot(1:ncol(resultsTest_GoogHL), 
+     sapply(resultsTest_GoogHL, function(Yhat){mean((Yhat - Ytest_googHL)^2)}), 
+     col = colVec[1],pch = 15, ylim = c(0.8,1.15), 
+     ylab = "GOOG Test Error- Supervisor = diffHighLow", xlab = " " )
+points(1:ncol(resultsTestSentiSum_GoogHL),  
+       sapply(resultsTestSentiSum_GoogHL, function(Yhat){mean((Yhat - Ytest_googHL)^2)}),  
+       col = colVec[2], pch = 16)
+points(1:ncol(resultsTestSentiMean_GoogHL),  
+       sapply(resultsTestSentiMean_GoogHL, function(Yhat){mean((Yhat - Ytest_googHL)^2)}),  
+       col = colVec[3], pch = 17)
+axis(1, labels = names(resultsTest_GoogHL), at = 1:ncol(resultsTest_GoogHL), 
+     las = 3)
+#legend('topright', col = colVec, pch = c(15:21), 
+#       legend = c('without Sentiments','with Sentiments(Sum)','with Sentiments(Mean)'))
+
+par(mar = c(7,5,4,2))
+plot(1:ncol(resultsTest_GoogSR), 
+     sapply(resultsTest_GoogSR, function(Yhat){mean((Yhat - Ytest_googSR)^2)}), 
+     col = colVec[1],pch = 15, ylim = c(0.5,1.7), 
+     ylab = "GOOG Test Error - Supervisor = stock return", xlab = " " )
+points(1:ncol(resultsTestSentiSum_GoogSR),  
+       sapply(resultsTestSentiSum_GoogSR, function(Yhat){mean((Yhat - Ytest_googSR)^2)}),  
+       col = colVec[2], pch = 16)
+points(1:ncol(resultsTestSentiMean_GoogSR),  
+       sapply(resultsTestSentiMean_GoogSR, function(Yhat){mean((Yhat - Ytest_googSR)^2)}),  
+       col = colVec[3], pch = 17)
+axis(1, labels = names(resultsTest_GoogSR), at = 1:ncol(resultsTest_GoogSR), 
+     las = 3)
+legend('topright', col = colVec, pch = c(15:21), 
+       legend = c('without Sentiments','with Sentiments(Sum)','with Sentiments(Mean)'))
+
+
+
+#Classification
+##TSLA
+
+par(mar = c(7,5,4,2))
+plot(1:ncol(resultsTestClass_Tsla), resultsTestClass_Tsla, col = colVec[1], 
+     pch = 15, ylim = c(0,0.6), ylab = "TSLA Accuracy- Supervisor = stock return (dummy)", xlab = " " )
+points(1:ncol(resultsTestClassSentiSum_Tsla),  resultsTestClassSentiSum_Tsla,  col = colVec[2], pch = 16)
+points(1:ncol(resultsTestClassSentiMean_Tsla),  resultsTestClassSentiMean_Tsla,  col = colVec[3], pch = 17)
+axis(1, labels = names(resultsTestClass_Tsla), at = 1:ncol(resultsTestClass_Tsla), 
+     las = 3)
+#legend('topright', col = colVec, pch = c(15:21), 
+#       legend = c('without Sentiments','with Sentiments(Sum)','with Sentiments(Mean)'))
+
+##GOOG
+
+par(mar = c(7,5,4,2))
+plot(1:ncol(resultsTestClass_Goog), resultsTestClass_Goog, col = colVec[1], 
+     pch = 15, ylim = c(0,1), ylab = "GOOG Accuracy- Supervisor = stock return (dummy)", xlab = " " )
+points(1:ncol(resultsTestClassSentiSum_Goog),  resultsTestClassSentiSum_Goog,  col = colVec[2], pch = 16)
+points(1:ncol(resultsTestClassSentiMean_Goog),  resultsTestClassSentiMean_Goog,  col = colVec[3], pch = 17)
 axis(1, labels = names(resultsTestClass_Goog), at = 1:ncol(resultsTestClass_Goog), 
      las = 3)
 legend('topright', col = colVec, pch = c(15:21), 
-       legend = c('with Sentiments(Sum)','without Sentiments'))
+       legend = c('without Sentiments','with Sentiments(Sum)','with Sentiments(Mean)'))
 
 ```
 
@@ -3565,7 +3656,8 @@ table(YhatTestSentiMean_TslaSRdummy,YhatTestSentiMean_TslaSRdummy)
 betaHatGlmnetTslaSRdummy_SentiMean = coef(glmnetOutTslaSRdummy_SentiMean, 
                                 s = elasticOutTslaSRdummy_SentiMean$bestTune$lambda)
 #Accuracy
-accuracyLinearSentiMean_TslaSRdummy = mean(YhatTestSentiMean_TslaSRdummy==Ytest_tslaSRdummy)
+table(YhatTestSentiMean_TslaSRdummy,Ytest_tslaSRdummy)
+(accuracyLinearSentiMean_TslaSRdummy = sum(diag(table(YhatTestSentiMean_TslaSRdummy, Ytest_tslaSRdummy)))/length(Ytest_tslaSRdummy))
 
 probHatTestSentiMean_TslaSRdummy_ = predict(elasticOutTslaSRdummy_SentiMean,
                                            XtestMatSentiMean_tslaSRdummy,
@@ -3615,7 +3707,8 @@ table(YhatTestSentiMean_GoogSRdummy,YhatTestSentiMean_GoogSRdummy)
 betaHatGlmnetGoogSRdummy_SentiMean = coef(glmnetOutGoogSRdummy_SentiMean, 
                                 s = elasticOutGoogSRdummy_SentiMean$bestTune$lambda)
 #Accuracy
-accuracyLinearSentiMean_GoogSRdummy = mean(YhatTestSentiMean_GoogSRdummy==Ytest_googSRdummy)
+(accuracyLinearSentiMean_GoogSRdummy = sum(diag(table(YhatTestSentiMean_GoogSRdummy, Ytest_googSRdummy)))/length(Ytest_googSRdummy))
+
 probHatTestSentiMean_GoogSRdummy_ = predict(elasticOutGoogSRdummy_SentiMean,
                                            XtestMatSentiMean_googSRdummy,
                                    s = elasticOutGoogSRdummy_SentiMean$bestTune$lambda,
@@ -4035,7 +4128,7 @@ knitr::kable(
 
 ```{r boostingMean}
 set.seed(2020)
-cl = parallel::makeCluster(8)
+cl = parallel::makeCluster(6)
 doParallel::registerDoParallel(cl)
 ####TSLA
 #Y1
@@ -4054,9 +4147,7 @@ boostOutRandomSentiMean_TslaHL = train(x = XtrainSentiMean_tslaHL, y = Ytrain_ts
 #plot(boostOutRandomSentiMean_TslaHL)
 
 #Y2
-set.seed(2020)
-cl = parallel::makeCluster(8)
-doParallel::registerDoParallel(cl)
+
 tuneGridRandom_TslaSR = expand.grid('nrounds'= c(50,150,500,1000,2000,3000),
                                    'max_depth' = 6,
                                    'eta' = c(0.01,0.03,0.05),
@@ -4097,9 +4188,7 @@ boostOutRandomSentiMean_TslaSRdummy = train(x = XtrainSentiMean_tslaSRdummy,
 
 
 ####GOOG
-set.seed(2020)
-cl = parallel::makeCluster(8)
-doParallel::registerDoParallel(cl)
+
 #Y1
 tuneGridRandom_GoogHL = expand.grid('nrounds'= c(50,150,500,1000,2000,3000),
                                    'max_depth' = 6,
@@ -4116,6 +4205,7 @@ boostOutRandomSentiMean_GoogHL = train(x = XtrainSentiMean_googHL, y = Ytrain_go
 #plot(boostOutRandomSentiMean_GoogHL)
 
 #Y2
+
 tuneGridRandom_GoogSR = expand.grid('nrounds'= c(50,150,500,1000,2000,3000),
                                    'max_depth' = 6,
                                    'eta' = c(0.01,0.03,0.05),
@@ -4132,6 +4222,9 @@ boostOutRandomSentiMean_GoogSR = train(x = XtrainSentiMean_googSR, y = Ytrain_go
 #boostOutRandomSentiMean_GoogSR$bestTune$nrounds
 
 #Y3
+set.seed(2020)
+cl = parallel::makeCluster(4)
+doParallel::registerDoParallel(cl)
 tuneGridRandom_GoogSRdummy = expand.grid(
                                    'nrounds'= c(50,150,500,1000,2000,3000),
                                    'max_depth' = 6,
@@ -4309,7 +4402,7 @@ YhatTestFDASentiMean_TslaSRdummyProb = predict(marsOutTslaSRdummy_SentiMean,
 YhatTestFDASentiMean_TslaSRdummy     = ifelse(YhatTestFDASentiMean_TslaSRdummyProb[,2] > 0.5, '1','0')
 
 table(YhatTestFDASentiMean_TslaSRdummy, Ytest_tslaSRdummy)
-(TslaSRdummySentiMean_accuracyFDA = Mean(diag(table(YhatTestFDASentiMean_TslaSRdummy, Ytest_tslaSRdummy)))/length(Ytest_tslaSRdummy))
+(TslaSRdummySentiMean_accuracyFDA = sum(diag(table(YhatTestFDASentiMean_TslaSRdummy, Ytest_tslaSRdummy)))/length(Ytest_tslaSRdummy))
 
 #TSLA Classification Tree - Y3
 YhatTestTreeSentiMean_TslaSRdummyProb = predict(rpartOutSentiMean_TslaSRdummy,
@@ -4317,7 +4410,7 @@ YhatTestTreeSentiMean_TslaSRdummyProb = predict(rpartOutSentiMean_TslaSRdummy,
                                                type = 'prob')
 YhatTestTreeSentiMean_TslaSRdummy     = ifelse(YhatTestTreeSentiMean_TslaSRdummyProb[,2] > 0.5, '1','0')
 table(YhatTestTreeSentiMean_TslaSRdummy, Ytest_tslaSRdummy)
-(TslaSRdummySentiMean_accuracyTree = Mean(diag(table(YhatTestTreeSentiMean_TslaSRdummy, Ytest_tslaSRdummy)))/length(Ytest_tslaSRdummy))
+(TslaSRdummySentiMean_accuracyTree = sum(diag(table(YhatTestTreeSentiMean_TslaSRdummy, Ytest_tslaSRdummy)))/length(Ytest_tslaSRdummy))
 
 #TSLA Random Forest - Y3
 
@@ -4327,7 +4420,7 @@ YhatTestRFSentiMean_TslaSRdummyRaw = predict(rfOutSentiMean_tslaSRdummy,
 YhatTestRFSentiMean_TslaSRdummy     = ifelse(YhatTestRFSentiMean_TslaSRdummyRaw == "Yes", '1','0')
 
 table(YhatTestRFSentiMean_TslaSRdummy, Ytest_tslaSRdummy)
-(TslaSRdummySentiMean_accuracyRF = Mean(diag(table(YhatTestRFSentiMean_TslaSRdummy, Ytest_tslaSRdummy)))/length(Ytest_tslaSRdummy))
+(TslaSRdummySentiMean_accuracyRF = sum(diag(table(YhatTestRFSentiMean_TslaSRdummy, Ytest_tslaSRdummy)))/length(Ytest_tslaSRdummy))
 
 #TSLA Boosting - Y3
 YhatTestBoostSentiMean_TslaSRdummyProb = predict(boostOutRandomSentiMean_TslaSRdummy,
@@ -4335,10 +4428,11 @@ YhatTestBoostSentiMean_TslaSRdummyProb = predict(boostOutRandomSentiMean_TslaSRd
 YhatTestBoostSentiMean_TslaSRdummy     = ifelse(YhatTestBoostSentiMean_TslaSRdummyProb[,2] > 0.5, '1','0')
 
 table(YhatTestBoostSentiMean_TslaSRdummy, Ytest_tslaSRdummy)
-(TslaSRdummySentiMean_accuracyBoost = Mean(diag(table(YhatTestBoostSentiMean_TslaSRdummy, Ytest_tslaSRdummy)))/length(Ytest_tslaSRdummy))
+(TslaSRdummySentiMean_accuracyBoost = sum(diag(table(YhatTestBoostSentiMean_TslaSRdummy, Ytest_tslaSRdummy)))/length(Ytest_tslaSRdummy))
 
-#Meanmary - TSLA - Classification
+#Summary - TSLA - Classification
 resultsTestClassSentiMean_Tsla = data.frame(
+  accuracyLogistic_SentiSum = accuracyLinearSentiMean_TslaSRdummy,#Logistic
   accuracyFDA_SentiMean  = TslaSRdummySentiMean_accuracyFDA,
   accuracyTree_SentiMean = TslaSRdummySentiMean_accuracyTree,
   accuracyRF_SentiMean = TslaSRdummySentiMean_accuracyRF,
@@ -4362,14 +4456,14 @@ YhatTestFDASentiMean_GoogSRdummyProb = predict(marsOutGoogSRdummy_SentiMean,
 YhatTestFDASentiMean_GoogSRdummy     = ifelse(YhatTestFDASentiMean_GoogSRdummyProb[,2] > 0.5, '1','0')
 
 table(YhatTestFDASentiMean_GoogSRdummy, Ytest_googSRdummy)
-(GoogSRdummySentiMean_accuracyFDA = Mean(diag(table(YhatTestFDASentiMean_GoogSRdummy, Ytest_googSRdummy)))/length(Ytest_googSRdummy))
+(GoogSRdummySentiMean_accuracyFDA = sum(diag(table(YhatTestFDASentiMean_GoogSRdummy, Ytest_googSRdummy)))/length(Ytest_googSRdummy))
 
 #GOOG Classification Tree - Y3
-YhatTestTreeSentiMean_GoogSRdummyProb = predict(rpartOutSentiMean_GoogSRdummy, Xtest_googSRdummy,
+YhatTestTreeSentiMean_GoogSRdummyProb = predict(rpartOutSentiMean_GoogSRdummy, XtestSentiMean_googSRdummy,
                                   type = 'prob')
 YhatTestTreeSentiMean_GoogSRdummy     = ifelse(YhatTestTreeSentiMean_GoogSRdummyProb[,2] > 0.5, '1','0')
 table(YhatTestTreeSentiMean_GoogSRdummy, Ytest_googSRdummy)
-(GoogSRdummySentiMean_accuracyTree = Mean(diag(table(YhatTestTreeSentiMean_GoogSRdummy, Ytest_googSRdummy)))/length(Ytest_googSRdummy))
+(GoogSRdummySentiMean_accuracyTree = sum(diag(table(YhatTestTreeSentiMean_GoogSRdummy, Ytest_googSRdummy)))/length(Ytest_googSRdummy))
 
 #GOOG Random Forest - Y3
 YhatTestRFSentiMean_GoogSRdummyRaw = predict(rfOutSentiMean_googSRdummy,
@@ -4379,7 +4473,7 @@ YhatTestRFSentiMean_GoogSRdummyRaw = predict(rfOutSentiMean_googSRdummy,
 YhatTestRFSentiMean_GoogSRdummy     = ifelse(YhatTestRFSentiMean_GoogSRdummyRaw == "Yes", '1','0')
 
 table(YhatTestRFSentiMean_GoogSRdummy, Ytest_googSRdummy)
-(GoogSRdummySentiMean_accuracyRF = Mean(diag(table(YhatTestRFSentiMean_GoogSRdummy, Ytest_googSRdummy)))/length(Ytest_googSRdummy))
+(GoogSRdummySentiMean_accuracyRF = sum(diag(table(YhatTestRFSentiMean_GoogSRdummy, Ytest_googSRdummy)))/length(Ytest_googSRdummy))
 
 
 #GOOG Boosting - Y3
@@ -4388,11 +4482,12 @@ YhatTestBoostSentiMean_GoogSRdummyProb = predict(boostOutRandomSentiMean_GoogSRd
 YhatTestBoostSentiMean_GoogSRdummy     = ifelse(YhatTestBoostSentiMean_GoogSRdummyProb[,2] > 0.5, '1','0')
 
 table(YhatTestBoostSentiMean_GoogSRdummy, Ytest_googSRdummy)
-(GoogSRdummySentiMean_accuracyBoost = Mean(diag(table(YhatTestBoostSentiMean_GoogSRdummy, Ytest_googSRdummy)))/length(Ytest_googSRdummy))
+(GoogSRdummySentiMean_accuracyBoost = sum(diag(table(YhatTestBoostSentiMean_GoogSRdummy, Ytest_googSRdummy)))/length(Ytest_googSRdummy))
 
 
-#Meanmary - GOOG - Classification
+#Summary - GOOG - Classification
 resultsTestClassSentiMean_Goog = data.frame(
+  accuracyLogistic_SentiSum = accuracyLinearSentiMean_GoogSRdummy,#Logistic
   accuracyFDA_SentiMean   = GoogSRdummySentiMean_accuracyFDA,
   accuracyTree_SentiMean  = GoogSRdummySentiMean_accuracyTree,
   accuracyRF_SentiMean    = GoogSRdummySentiMean_accuracyRF,
