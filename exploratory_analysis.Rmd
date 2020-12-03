@@ -1080,7 +1080,8 @@ XtslaWithoutSentiments = XtslaWithSentiments %>%
   select(-c(tslaSentimentsSum,tslaSentimentsMean))
 XgoogWithoutSentiments = XgoogWithSentiments %>%
   select(-c(googSentimentsSum,googSentimentsMean))
-
+nrow(XtslaWithoutSentiments)
+nrow(XgoogWithoutSentiments)
 #Data Split
 ##TSLA
 
